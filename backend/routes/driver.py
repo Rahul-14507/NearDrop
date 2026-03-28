@@ -1,3 +1,4 @@
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
@@ -5,7 +6,7 @@ from datetime import datetime, date
 
 from backend.database import get_db
 from backend.models import Driver, Delivery, DeliveryStatus
-from backend.schemas import DriverScore
+from backend.schemas import DriverScore, DeliveryOut
 
 router = APIRouter(prefix="/driver", tags=["driver"])
 
@@ -43,3 +44,18 @@ async def get_driver_score(driver_id: int, db: AsyncSession = Depends(get_db)):
         trust_score=driver.trust_score,
         recent_deliveries=history,
     )
+
+
+@router.get("/{driver_id}/active_delivery", response_model=Optional[DeliveryOut])
+async def get_active_delivery(driver_id: int, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(Delivery)
+        .where(
+            Delivery.driver_id == driver_id,
+            Delivery.status.in_([DeliveryStatus.en_route, DeliveryStatus.arrived, DeliveryStatus.failed])
+        )
+        .order_by(Delivery.created_at.desc())
+        .limit(1)
+    )
+    delivery = result.scalar_one_or_none()
+    return delivery

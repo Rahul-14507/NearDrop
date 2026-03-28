@@ -1,17 +1,30 @@
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  Legend, ResponsiveContainer, Cell,
+  ResponsiveContainer, Cell,
 } from 'recharts'
+import { Activity } from 'lucide-react'
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null
   return (
-    <div className="bg-navy-800 border border-white/10 rounded-xl px-3 py-2 shadow-card text-xs">
-      <p className="text-white/60 mb-1">{label}:00 — {label}:59</p>
-      {payload.map((p) => (
-        <p key={p.name} style={{ color: p.fill }} className="font-semibold">
-          {p.name}: {p.value}
-        </p>
+    <div style={{
+      background: 'rgba(8,15,30,0.95)',
+      border: '1px solid rgba(255,255,255,0.1)',
+      borderRadius: 12,
+      padding: '10px 14px',
+      backdropFilter: 'blur(12px)',
+      boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+    }}>
+      <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, marginBottom: 6 }}>
+        {label}:00 – {label}:59
+      </p>
+      {payload.map(p => (
+        <div key={p.name} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+          <span style={{ width: 8, height: 8, borderRadius: 2, background: p.fill, display: 'inline-block', flexShrink: 0 }} />
+          <span style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.85)', textTransform: 'capitalize' }}>
+            {p.name}: {p.value}
+          </span>
+        </div>
       ))}
     </div>
   )
@@ -19,50 +32,87 @@ const CustomTooltip = ({ active, payload, label }) => {
 
 export default function DeliveryChart({ data = [] }) {
   const isEmpty = data.length === 0
-
-  // Fallback demo data when API is not seeded
   const chartData = isEmpty
-    ? Array.from({ length: 12 }, (_, i) => ({
-        hour: i + 7,
-        deliveries: Math.floor(Math.random() * 12) + 2,
-        failures: Math.floor(Math.random() * 3),
+    ? Array.from({ length: 10 }, (_, i) => ({
+        hour: i + 8,
+        deliveries: Math.floor(Math.random() * 9) + 3,
+        failures: Math.floor(Math.random() * 2),
       }))
-    : data.map((d) => ({ ...d, hour: `${d.hour}h` }))
+    : data.map(d => ({ ...d, hour: `${d.hour}` }))
+
+  const maxVal = Math.max(...chartData.map(d => d.deliveries + d.failures), 1)
 
   return (
-    <div className="glass-raised p-5">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h3 className="font-bold text-white">Hourly Delivery Activity</h3>
-          <p className="text-xs text-white/40 mt-0.5">Deliveries vs Failures by hour</p>
+    <div className="surface-md p-5 h-full">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(0,201,177,0.1)' }}>
+            <Activity className="w-4 h-4" style={{ color: '#00c9b1' }} />
+          </div>
+          <div>
+            <h3 className="font-bold text-white text-sm">Hourly Activity</h3>
+            <p className="text-[11px]" style={{ color: 'rgba(255,255,255,0.35)' }}>Deliveries vs failures by hour</p>
+          </div>
         </div>
-        <div className="flex items-center gap-4 text-xs">
-          <span className="flex items-center gap-1.5 text-teal-400">
-            <span className="w-3 h-3 rounded bg-teal-500 inline-block" />Deliveries
-          </span>
-          <span className="flex items-center gap-1.5 text-red-400">
-            <span className="w-3 h-3 rounded bg-red-500 inline-block" />Failures
-          </span>
+
+        {/* Legend */}
+        <div className="flex items-center gap-3">
+          {[
+            { color: '#00c9b1', label: 'Delivered' },
+            { color: '#f87171', label: 'Failed' },
+          ].map(({ color, label }) => (
+            <div key={label} className="flex items-center gap-1.5">
+              <span style={{ width: 10, height: 10, borderRadius: 3, background: color, display: 'inline-block' }} />
+              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', fontWeight: 500 }}>{label}</span>
+            </div>
+          ))}
         </div>
       </div>
 
       <ResponsiveContainer width="100%" height={220}>
-        <BarChart data={chartData} barGap={4} barCategoryGap="30%">
-          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+        <BarChart data={chartData} barGap={3} barCategoryGap="28%">
+          <CartesianGrid
+            strokeDasharray="0"
+            horizontal={true}
+            vertical={false}
+            stroke="rgba(255,255,255,0.04)"
+          />
           <XAxis
             dataKey="hour"
-            tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11 }}
+            tick={{ fill: 'rgba(255,255,255,0.35)', fontSize: 11, fontWeight: 500 }}
+            tickFormatter={v => `${v}h`}
             axisLine={false}
             tickLine={false}
+            dy={6}
           />
           <YAxis
-            tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11 }}
+            tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 11 }}
             axisLine={false}
             tickLine={false}
+            width={24}
           />
-          <Tooltip content={<CustomTooltip />} />
-          <Bar dataKey="deliveries" fill="#00c9b1" radius={[4, 4, 0, 0]} maxBarSize={24} />
-          <Bar dataKey="failures"   fill="#ef4444" radius={[4, 4, 0, 0]} maxBarSize={24} opacity={0.8} />
+          <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.03)', radius: 6 }} />
+
+          <Bar dataKey="deliveries" radius={[5, 5, 0, 0]} maxBarSize={20}>
+            {chartData.map((entry, i) => (
+              <Cell
+                key={i}
+                fill={entry.deliveries / maxVal > 0.6 ? '#00c9b1' : '#00a892'}
+                fillOpacity={0.9}
+              />
+            ))}
+          </Bar>
+
+          <Bar dataKey="failures" radius={[5, 5, 0, 0]} maxBarSize={20}>
+            {chartData.map((entry, i) => (
+              <Cell
+                key={i}
+                fill="#ef4444"
+                fillOpacity={entry.failures > 0 ? 0.75 : 0}
+              />
+            ))}
+          </Bar>
         </BarChart>
       </ResponsiveContainer>
     </div>

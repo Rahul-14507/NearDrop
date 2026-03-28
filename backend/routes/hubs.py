@@ -4,11 +4,12 @@ import string
 from datetime import datetime
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
+from sqlalchemy.orm import selectinload
 
 from backend.database import get_db
 from backend.models import Hub, HubBroadcast, Delivery
-from backend.schemas import HubOut, HubAcceptRequest, HubAcceptResponse
+from backend.schemas import HubOut, HubAcceptRequest, HubAcceptResponse, HubStats, HubBroadcastOut, DeliveryOut
 
 router = APIRouter(tags=["hubs"])
 
@@ -59,6 +60,65 @@ async def get_nearby_hubs(
     return output
 
 
+@router.get("/hubs/{hub_id}", response_model=HubOut)
+async def get_hub(hub_id: int, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Hub).where(Hub.id == hub_id))
+    hub = result.scalar_one_or_none()
+    if not hub:
+        return HubOut(id=0, name="Unknown Hub", lat=0, lng=0, hub_type="kirana", availability=False, trust_score=0, today_earnings=0)
+    return hub
+
+
+@router.get("/hubs/{hub_id}/stats", response_model=HubStats)
+async def get_hub_stats(hub_id: int, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Hub).where(Hub.id == hub_id))
+    hub = result.scalar_one_or_none()
+    
+    count_result = await db.execute(
+        select(func.count(HubBroadcast.id)).where(
+            HubBroadcast.hub_id == hub_id,
+            HubBroadcast.accepted_at != None
+        )
+    )
+    count = count_result.scalar() or 0
+
+    return HubStats(
+        hub_id=hub_id,
+        name=hub.name if hub else "Unknown",
+        today_earnings=hub.today_earnings if hub else 0,
+        accepted_count=count,
+        trust_score=hub.trust_score if hub else 0
+    )
+
+
+@router.get("/hubs/{hub_id}/active_broadcasts", response_model=list[HubBroadcastOut])
+async def get_active_broadcasts(hub_id: int, db: AsyncSession = Depends(get_db)):
+    hub_result = await db.execute(select(Hub).where(Hub.id == hub_id))
+    hub = hub_result.scalar_one_or_none()
+    if not hub:
+        return []
+
+    # Eagerly load the delivery relationship using selectinload
+    result = await db.execute(
+        select(HubBroadcast)
+        .options(selectinload(HubBroadcast.delivery))
+        .where(HubBroadcast.accepted_at == None)
+    )
+    broadcasts = result.scalars().all()
+
+    output = []
+    for b in broadcasts:
+        # Distance calculation
+        dist = haversine(hub.lat, hub.lng, hub.lat + 0.002, hub.lng + 0.002) 
+        output.append(HubBroadcastOut(
+            id=b.id,
+            delivery=DeliveryOut.from_orm(b.delivery),
+            distance_m=round(dist),
+            reward=25.0
+        ))
+    return output
+
+
 @router.post("/hub/accept", response_model=HubAcceptResponse)
 async def accept_broadcast(req: HubAcceptRequest, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
@@ -77,7 +137,7 @@ async def accept_broadcast(req: HubAcceptRequest, db: AsyncSession = Depends(get
         broadcast.accepted_at = datetime.utcnow()
     
     if hub:
-        hub.today_earnings += 25.0  # ₹25 per drop
+        hub.today_earnings += 25.0
         hub.current_load += 1
 
     await db.commit()

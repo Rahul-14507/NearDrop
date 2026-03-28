@@ -31,7 +31,7 @@ class DriverScore(BaseModel):
 class HubOut(BaseModel):
     id: int
     name: str
-    owner_name: Optional[str]
+    owner_name: Optional[str] = None
     lat: float
     lng: float
     hub_type: str
@@ -45,7 +45,38 @@ class HubOut(BaseModel):
         from_attributes = True
 
 
+class HubStats(BaseModel):
+    hub_id: int
+    name: str
+    today_earnings: float
+    accepted_count: int
+    trust_score: int
+
+
 # --- Delivery ---
+class DeliveryOut(BaseModel):
+    id: int
+    order_id: str
+    address: str
+    status: str
+    recipient_name: Optional[str]
+    package_size: str
+    weight_kg: float
+    created_at: datetime
+    pickup_code: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class HubBroadcastOut(BaseModel):
+    id: int
+    delivery: DeliveryOut
+    distance_m: float
+    reward: float
+
+    class Config:
+        from_attributes = True
 class DeliveryFailRequest(BaseModel):
     delivery_id: int
     driver_lat: float
