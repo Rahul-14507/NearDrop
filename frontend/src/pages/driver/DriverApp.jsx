@@ -22,31 +22,40 @@ export default function DriverApp() {
   const { toasts, addToast, removeToast } = useToasts()
 
   const fetchData = useCallback(async () => {
-    try {
-      const [dResult, adResult] = await Promise.all([
-        getDriverScore(DRIVER_ID),
-        getActiveDelivery(DRIVER_ID),
-      ])
+    const fallbackDelivery = {
+      id: 999,
+      order_id: 'ND10008',
+      address: 'Shop 7, Jubilee Hills Check Post, Hyderabad - 500033',
+      status: 'en_route',
+      recipient_name: 'Anita Singh',
+      package_size: 'medium',
+      weight_kg: 8.9,
+    }
+
+    const [dResult, adResult] = await Promise.allSettled([
+      getDriverScore(DRIVER_ID),
+      getActiveDelivery(DRIVER_ID),
+    ])
+
+    if (dResult.status === 'fulfilled') {
       setDriver({
         id: DRIVER_ID,
-        name: dResult.data.name,
-        trust_score: dResult.data.trust_score,
+        name: dResult.value.data.name,
+        trust_score: dResult.value.data.trust_score,
         vehicle: 'Royal Enfield',
       })
-      setDelivery(adResult.data || {
-        id: 999,
-        order_id: 'ND10008',
-        address: 'Shop 7, Jubilee Hills Check Post, Hyderabad - 500033',
-        status: 'en_route',
-        recipient_name: 'Anita Singh',
-        package_size: 'medium',
-        weight_kg: 8.9,
-      })
-    } catch {
-      addToast('Failed to load delivery', 'error')
-    } finally {
-      setLoading(false)
+    } else {
+      setDriver({ id: DRIVER_ID, name: 'Arjun Reddy', trust_score: 0, vehicle: 'Royal Enfield' })
     }
+
+    if (adResult.status === 'fulfilled') {
+      setDelivery(adResult.value.data || fallbackDelivery)
+    } else {
+      addToast('Failed to load delivery', 'error')
+      setDelivery(fallbackDelivery)
+    }
+
+    setLoading(false)
   }, [addToast])
 
   useEffect(() => { fetchData() }, [fetchData])
