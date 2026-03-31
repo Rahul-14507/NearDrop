@@ -7,6 +7,7 @@ import 'package:neardrop/core/storage/secure_storage.dart';
 import 'package:neardrop/core/theme/app_theme.dart';
 import 'package:neardrop/features/auth/bloc/auth_bloc.dart';
 import 'package:neardrop/features/auth/bloc/auth_event.dart';
+import 'package:neardrop/features/auth/bloc/auth_state.dart';
 import 'package:neardrop/features/auth/models/user_model.dart';
 import 'package:neardrop/features/driver/widgets/trust_score_badge.dart';
 import 'package:neardrop/features/hub/bloc/hub_bloc.dart';
@@ -95,40 +96,50 @@ class _HubHomeScreenState extends State<HubHomeScreen> {
   Widget build(BuildContext context) {
     return BlocProvider.value(
       value: _hubBloc,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('NearDrop Hub'),
-          actions: [
-            BlocBuilder<HubBloc, HubState>(
-              builder: (context, state) {
-                final score =
-                    state is HubStatsLoaded ? state.stats.trustScore : 0;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 12),
-                  child: TrustScoreBadge(score: score),
-                );
-              },
-            ),
-          ],
-        ),
-        body: _buildBody(),
-        bottomNavigationBar: BottomNavigationBar(
-          currentIndex: _currentIndex,
-          onTap: (i) => setState(() => _currentIndex = i),
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.inventory_2_rounded),
-              label: 'Packages',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.payments_outlined),
-              label: 'Earnings',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline_rounded),
-              label: 'Profile',
-            ),
-          ],
+      child: BlocListener<AuthBloc, AuthState>(
+        listener: (context, state) {
+          if (state is AuthUnauthenticated) {
+            Navigator.of(context).pushReplacementNamed('/login');
+          }
+        },
+        child: Scaffold(
+          appBar: AppBar(
+            title: const Text('NearDrop Hub'),
+            actions: [
+              BlocBuilder<HubBloc, HubState>(
+                builder: (context, state) {
+                  final score = state is HubStatsLoaded
+                      ? state.stats.trustScore
+                      : state is HubBroadcastsLoaded
+                          ? state.trustScore
+                          : 0;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 12),
+                    child: TrustScoreBadge(score: score),
+                  );
+                },
+              ),
+            ],
+          ),
+          body: _buildBody(),
+          bottomNavigationBar: BottomNavigationBar(
+            currentIndex: _currentIndex,
+            onTap: (i) => setState(() => _currentIndex = i),
+            items: const [
+              BottomNavigationBarItem(
+                icon: Icon(Icons.inventory_2_rounded),
+                label: 'Packages',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.payments_outlined),
+                label: 'Earnings',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.person_outline_rounded),
+                label: 'Profile',
+              ),
+            ],
+          ),
         ),
       ),
     );

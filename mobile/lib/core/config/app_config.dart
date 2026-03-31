@@ -9,8 +9,8 @@ class AppConfig {
   // ── Backend ──────────────────────────────────────────────
   // Change this to your Azure App Service URL in production
   // e.g. https://neardrop-api.azurewebsites.net
-  static const String baseUrl = 'http://192.168.1.8:8000'; // physical device on same WiFi
-  static const String wsBaseUrl = 'ws://192.168.1.8:8000'; // WebSocket base
+  static const String baseUrl = 'http://localhost:8000'; // Chrome web dev (same machine)
+  static const String wsBaseUrl = 'ws://localhost:8000'; // WebSocket base
 
   // ── Azure Maps ───────────────────────────────────────────
   // portal.azure.com → Azure Maps Account → Authentication

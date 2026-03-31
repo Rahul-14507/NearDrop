@@ -17,10 +17,16 @@ class HubBloc extends Bloc<HubEvent, HubState> {
     HubBroadcastsLoadRequested event,
     Emitter<HubState> emit,
   ) async {
+    // Preserve trust score if stats already loaded
+    final existingTrustScore = state is HubStatsLoaded
+        ? (state as HubStatsLoaded).stats.trustScore
+        : state is HubBroadcastsLoaded
+            ? (state as HubBroadcastsLoaded).trustScore
+            : 0;
     emit(const HubLoading());
     final result = await _repository.getActiveBroadcasts(event.hubId);
     if (result.isSuccess) {
-      emit(HubBroadcastsLoaded(result.data ?? []));
+      emit(HubBroadcastsLoaded(result.data ?? [], trustScore: existingTrustScore));
     } else {
       emit(HubError(result.error ?? 'Failed to load broadcasts'));
     }
@@ -51,7 +57,13 @@ class HubBloc extends Bloc<HubEvent, HubState> {
   ) async {
     final result = await _repository.getHubStats(event.hubId);
     if (result.isSuccess && result.data != null) {
-      emit(HubStatsLoaded(result.data!));
+      final stats = result.data!;
+      // Merge trust score into broadcasts state so we don't blank the packages tab
+      if (state is HubBroadcastsLoaded) {
+        emit((state as HubBroadcastsLoaded).copyWith(trustScore: stats.trustScore, hubStats: stats));
+      } else {
+        emit(HubStatsLoaded(stats));
+      }
     } else {
       emit(HubError(result.error ?? 'Failed to load stats'));
     }

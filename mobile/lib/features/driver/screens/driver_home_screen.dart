@@ -7,6 +7,7 @@ import 'package:neardrop/core/storage/secure_storage.dart';
 import 'package:neardrop/core/theme/app_theme.dart';
 import 'package:neardrop/features/auth/bloc/auth_bloc.dart';
 import 'package:neardrop/features/auth/bloc/auth_event.dart';
+import 'package:neardrop/features/auth/bloc/auth_state.dart';
 import 'package:neardrop/features/auth/models/user_model.dart';
 import 'package:neardrop/features/driver/bloc/delivery_bloc.dart';
 import 'package:neardrop/features/driver/bloc/delivery_event.dart';
@@ -98,42 +99,48 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         BlocProvider.value(value: _deliveryBloc),
         BlocProvider.value(value: _voiceBloc),
       ],
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text(AppStrings.appName),
-          actions: [
-            BlocBuilder<DriverBloc, DriverState>(
-              bloc: _driverBloc,
-              builder: (context, state) {
-                final score = state is DriverProfileLoaded
-                    ? state.trustScore
-                    : 0;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 12),
-                  child: TrustScoreBadge(score: score),
-                );
-              },
-            ),
-          ],
-        ),
-        body: _buildBody(),
-        bottomNavigationBar: BottomNavigationBar(
-          currentIndex: _currentIndex,
-          onTap: (i) => setState(() => _currentIndex = i),
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.local_shipping_rounded),
-              label: 'Delivery',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.history_rounded),
-              label: 'History',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline_rounded),
-              label: 'Profile',
-            ),
-          ],
+      child: BlocListener<AuthBloc, AuthState>(
+        listener: (context, state) {
+          if (state is AuthUnauthenticated) {
+            Navigator.of(context).pushReplacementNamed('/login');
+          }
+        },
+        child: Scaffold(
+          appBar: AppBar(
+            title: const Text(AppStrings.appName),
+            actions: [
+              BlocBuilder<DriverBloc, DriverState>(
+                bloc: _driverBloc,
+                builder: (context, state) {
+                  final score =
+                      state is DriverProfileLoaded ? state.trustScore : 0;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 12),
+                    child: TrustScoreBadge(score: score),
+                  );
+                },
+              ),
+            ],
+          ),
+          body: _buildBody(),
+          bottomNavigationBar: BottomNavigationBar(
+            currentIndex: _currentIndex,
+            onTap: (i) => setState(() => _currentIndex = i),
+            items: const [
+              BottomNavigationBarItem(
+                icon: Icon(Icons.local_shipping_rounded),
+                label: 'Delivery',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.history_rounded),
+                label: 'History',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.person_outline_rounded),
+                label: 'Profile',
+              ),
+            ],
+          ),
         ),
       ),
     );

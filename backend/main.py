@@ -52,8 +52,8 @@ app.add_middleware(
 async def jwt_middleware(request: Request, call_next):
     path = request.url.path
 
-    # Skip auth for open paths and WebSocket upgrades
-    if any(path.startswith(p) for p in _OPEN_PREFIXES) or path.startswith("/ws"):
+    # Skip auth for CORS preflight, open paths, and WebSocket upgrades
+    if request.method == "OPTIONS" or any(path.startswith(p) for p in _OPEN_PREFIXES) or path.startswith("/ws"):
         return await call_next(request)
 
     auth_header = request.headers.get("Authorization", "")

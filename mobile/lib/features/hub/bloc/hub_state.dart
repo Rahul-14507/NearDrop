@@ -18,11 +18,21 @@ class HubLoading extends HubState {
 
 class HubBroadcastsLoaded extends HubState {
   final List<BroadcastModel> broadcasts;
+  final int trustScore;
+  final HubStatsModel? hubStats;
 
-  const HubBroadcastsLoaded(this.broadcasts);
+  const HubBroadcastsLoaded(this.broadcasts, {this.trustScore = 0, this.hubStats});
+
+  HubBroadcastsLoaded copyWith({List<BroadcastModel>? broadcasts, int? trustScore, HubStatsModel? hubStats}) {
+    return HubBroadcastsLoaded(
+      broadcasts ?? this.broadcasts,
+      trustScore: trustScore ?? this.trustScore,
+      hubStats: hubStats ?? this.hubStats,
+    );
+  }
 
   @override
-  List<Object?> get props => [broadcasts];
+  List<Object?> get props => [broadcasts, trustScore, hubStats];
 }
 
 class HubBroadcastAcceptedState extends HubState {
