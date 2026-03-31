@@ -6,7 +6,7 @@ from sqlalchemy import select
 
 from auth import create_access_token, verify_password, get_current_user
 from database import get_db
-from models import User, UserRole
+from models import User, UserRole, Dispatcher
 from schemas import LoginRequest, TokenResponse, UserProfile
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -14,6 +14,40 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post("/login", response_model=TokenResponse)
 async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
+    # Dispatcher: email-based login against the Dispatcher table
+    if req.role == "dispatcher":
+        if not req.email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email required for dispatcher login",
+            )
+        result = await db.execute(select(Dispatcher).where(Dispatcher.email == req.email))
+        dispatcher = result.scalar_one_or_none()
+        if dispatcher is None or not verify_password(req.password, dispatcher.password_hash):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid email or password",
+            )
+        token = create_access_token({
+            "sub": str(dispatcher.id),
+            "role": "dispatcher",
+            "name": dispatcher.name,
+        })
+        return TokenResponse(
+            access_token=token,
+            token_type="bearer",
+            user_id=dispatcher.id,
+            role="dispatcher",
+            name=dispatcher.name,
+            dispatcher_id=dispatcher.id,
+        )
+
+    # Driver / hub_owner: phone-based login against the User table
+    if not req.phone:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Phone required for driver/hub_owner login",
+        )
     result = await db.execute(select(User).where(User.phone == req.phone))
     user = result.scalar_one_or_none()
 
@@ -23,7 +57,6 @@ async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
             detail="Invalid phone number or password",
         )
 
-    # Validate role matches
     expected_role = UserRole.driver if req.role == "driver" else UserRole.hub_owner
     if user.role != expected_role:
         raise HTTPException(

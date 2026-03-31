@@ -13,6 +13,7 @@ from websocket_manager import manager
 from routes import delivery, hubs, driver, dashboard
 from routes import auth as auth_router
 from routes import voice as voice_router
+from routes import dispatcher as dispatcher_router
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +53,6 @@ app.add_middleware(
 async def jwt_middleware(request: Request, call_next):
     path = request.url.path
 
-    # Skip auth for CORS preflight, open paths, and WebSocket upgrades
     if request.method == "OPTIONS" or any(path.startswith(p) for p in _OPEN_PREFIXES) or path.startswith("/ws"):
         return await call_next(request)
 
@@ -85,6 +85,9 @@ app.include_router(delivery.router)
 app.include_router(hubs.router)
 app.include_router(driver.router)
 app.include_router(dashboard.router)
+
+# Dispatcher portal routes (additionally protected by require_dispatcher dependency)
+app.include_router(dispatcher_router.router)
 
 
 @app.websocket("/ws")

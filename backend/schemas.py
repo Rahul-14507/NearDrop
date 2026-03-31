@@ -27,6 +27,11 @@ class DriverScore(BaseModel):
     recent_deliveries: List[dict]
 
 
+class DriverLocationUpdate(BaseModel):
+    lat: float
+    lng: float
+
+
 # --- Hub ---
 class HubOut(BaseModel):
     id: int
@@ -64,6 +69,12 @@ class DeliveryOut(BaseModel):
     weight_kg: float
     created_at: datetime
     pickup_code: Optional[str] = None
+    queue_position: Optional[int] = None
+    batch_id: Optional[int] = None
+    customer_email: Optional[str] = None
+    customer_phone: Optional[str] = None
+    hub_otp_verified: Optional[bool] = None
+    hub_otp_sent_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
@@ -77,6 +88,20 @@ class HubBroadcastOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class StoredPackageOut(BaseModel):
+    delivery_id: int
+    order_id: str
+    address: str
+    recipient_name: Optional[str] = None
+    hub_otp_verified: bool
+    hub_otp_sent_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
 class DeliveryFailRequest(BaseModel):
     delivery_id: int
     driver_lat: float
@@ -99,6 +124,22 @@ class HubAcceptResponse(BaseModel):
     pickup_code: str
     hub_name: str
     delivery_id: int
+
+
+class HubConfirmPickupRequest(BaseModel):
+    delivery_id: int
+
+
+# --- OTP ---
+class OTPVerifyRequest(BaseModel):
+    otp: str
+
+
+class OTPVerifyResponse(BaseModel):
+    verified: bool
+    customer_name: Optional[str] = None
+    package_id: Optional[str] = None
+    message: Optional[str] = None
 
 
 # --- Dashboard ---
@@ -132,14 +173,15 @@ class LeaderboardEntry(BaseModel):
     name: str
     deliveries_completed: int
     trust_score: int
-    trend: str  # "up" | "down" | "stable"
+    trend: str   # "up" | "down" | "stable"
 
 
 # --- Auth ---
 class LoginRequest(BaseModel):
-    phone: str
+    phone: Optional[str] = None
+    email: Optional[str] = None
     password: str
-    role: str  # "driver" | "hub_owner"
+    role: str   # "driver" | "hub_owner" | "dispatcher"
 
 
 class TokenResponse(BaseModel):
@@ -148,6 +190,7 @@ class TokenResponse(BaseModel):
     user_id: int
     role: str
     name: str
+    dispatcher_id: Optional[int] = None
 
 
 class UserProfile(BaseModel):
@@ -165,3 +208,86 @@ class FCMTokenRequest(BaseModel):
 class DeliveryCompleteResponse(BaseModel):
     success: bool
     delivery_id: int
+
+
+# --- Dispatcher ---
+class DispatcherDriverOut(BaseModel):
+    id: int
+    name: str
+    phone: Optional[str]
+    is_active: bool
+    current_lat: float
+    current_lng: float
+    today_assigned: int
+    today_completed: int
+    today_failed: int
+    trust_score: int
+
+
+class DispatcherStatsOut(BaseModel):
+    active_drivers: int
+    total_assigned_today: int
+    delivered_today: int
+    failed_today: int
+    hub_rerouted_today: int
+    pending_today: int
+    success_rate_percent: float
+    co2_saved_kg: float
+
+
+class DispatcherDeliveryOut(BaseModel):
+    id: int
+    order_id: str
+    address: str
+    status: str
+    recipient_name: Optional[str] = None
+    customer_email: Optional[str] = None
+    customer_phone: Optional[str] = None
+    package_size: str
+    weight_kg: float
+    queue_position: Optional[int] = None
+    created_at: datetime
+    hub_otp_verified: Optional[bool] = None
+    hub_otp_sent_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class DispatcherBatchOut(BaseModel):
+    id: int
+    batch_code: str
+    driver_id: int
+    driver_name: str
+    dispatcher_id: int
+    assigned_at: datetime
+    total_deliveries: int
+    status: str
+    delivered_count: int
+    failed_count: int
+    pending_count: int
+
+
+class BatchUploadResponse(BaseModel):
+    batch_code: str
+    driver_id: int
+    driver_name: str
+    total_deliveries: int
+    deliveries: List[DispatcherDeliveryOut]
+
+
+class DispatcherDeliveryListOut(BaseModel):
+    id: int
+    order_id: str
+    address: str
+    status: str
+    recipient_name: Optional[str] = None
+    driver_name: Optional[str] = None
+    driver_id: Optional[int] = None
+    batch_code: Optional[str] = None
+    queue_position: Optional[int] = None
+    customer_email: Optional[str] = None
+    customer_phone: Optional[str] = None
+    hub_otp_verified: Optional[bool] = None
+    hub_otp_sent_at: Optional[datetime] = None
+    created_at: datetime

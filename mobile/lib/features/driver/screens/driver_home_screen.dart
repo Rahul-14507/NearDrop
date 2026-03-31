@@ -67,6 +67,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       sl<WebSocketService>().events.listen((event) {
         if (!mounted) return;
         final type = event['type'] as String?;
+
         if (type == 'hub_accepted') {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -77,9 +78,101 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           if (_user != null) {
             _deliveryBloc.add(DeliveryLoadRequested(_user!.userId));
           }
+        } else if (type == 'batch_assigned') {
+          final driverId = event['driver_id'] as int?;
+          if (driverId != null && driverId != _user?.userId) return;
+          _showBatchAssignedSheet(event);
         }
       });
     }
+  }
+
+  void _showBatchAssignedSheet(Map<String, dynamic> event) {
+    final batchCode = event['batch_code'] as String? ?? '';
+    final totalDeliveries = event['total_deliveries'] as int? ?? 0;
+    final firstDelivery = event['first_delivery'] as Map<String, dynamic>?;
+    final firstAddress = firstDelivery?['address'] as String? ?? '';
+
+    showModalBottomSheet<void>(
+      context: context,
+      isDismissible: false,
+      enableDrag: false,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: const BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(24, 20, 24, 40),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  color: AppColors.divider,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const Icon(Icons.local_shipping_rounded, color: AppColors.accent, size: 36),
+            const SizedBox(height: 16),
+            Text(
+              'New deliveries assigned',
+              style: Theme.of(ctx).textTheme.titleLarge?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '$totalDeliveries deliveries · $batchCode',
+              style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.accent,
+                  ),
+            ),
+            if (firstAddress.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(
+                'First stop: $firstAddress',
+                style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+              ),
+            ],
+            const SizedBox(height: 28),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accent,
+                  foregroundColor: AppColors.background,
+                  minimumSize: const Size.fromHeight(52),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                  setState(() => _currentIndex = 0);
+                  if (_user != null) {
+                    _deliveryBloc.add(DeliveryLoadRequested(_user!.userId));
+                  }
+                },
+                child: const Text(
+                  'Start Deliveries',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override

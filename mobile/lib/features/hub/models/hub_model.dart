@@ -72,3 +72,36 @@ class HubStatsModel extends Equatable {
   @override
   List<Object?> get props => [hubId, todayEarnings, acceptedCount];
 }
+
+class StoredPackageModel extends Equatable {
+  final int deliveryId;
+  final String orderId;
+  final String address;
+  final String? recipientName;
+  final bool hubOtpVerified;
+  final DateTime? hubOtpSentAt;
+
+  const StoredPackageModel({
+    required this.deliveryId,
+    required this.orderId,
+    required this.address,
+    this.recipientName,
+    required this.hubOtpVerified,
+    this.hubOtpSentAt,
+  });
+
+  factory StoredPackageModel.fromJson(Map<String, dynamic> json) =>
+      StoredPackageModel(
+        deliveryId: json['delivery_id'] as int,
+        orderId: json['order_id'] as String,
+        address: json['address'] as String,
+        recipientName: json['recipient_name'] as String?,
+        hubOtpVerified: json['hub_otp_verified'] as bool? ?? false,
+        hubOtpSentAt: json['hub_otp_sent_at'] != null
+            ? DateTime.parse(json['hub_otp_sent_at'] as String)
+            : null,
+      );
+
+  @override
+  List<Object?> get props => [deliveryId, hubOtpVerified];
+}

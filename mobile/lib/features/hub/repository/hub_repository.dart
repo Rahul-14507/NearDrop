@@ -44,4 +44,41 @@ class HubRepository {
       return ApiResponse.failure(e.toString());
     }
   }
+
+  Future<ApiResponse<List<StoredPackageModel>>> getStoredPackages(
+      int hubId) async {
+    try {
+      final resp = await _api.get('/hubs/$hubId/stored_packages');
+      final list = (resp.data as List)
+          .map((e) => StoredPackageModel.fromJson(e as Map<String, dynamic>))
+          .toList();
+      return ApiResponse.success(list);
+    } catch (e) {
+      return ApiResponse.failure(e.toString());
+    }
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> verifyOtp(
+    int deliveryId,
+    String otp,
+  ) async {
+    try {
+      final resp = await _api.post(
+        '/delivery/$deliveryId/verify-otp',
+        data: {'otp': otp},
+      );
+      return ApiResponse.success(resp.data as Map<String, dynamic>);
+    } catch (e) {
+      return ApiResponse.failure(e.toString());
+    }
+  }
+
+  Future<ApiResponse<void>> resendOtp(int deliveryId) async {
+    try {
+      await _api.post('/delivery/$deliveryId/resend-otp', data: {});
+      return ApiResponse.success(null);
+    } catch (e) {
+      return ApiResponse.failure(e.toString());
+    }
+  }
 }

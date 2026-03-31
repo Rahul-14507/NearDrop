@@ -7,7 +7,10 @@ import random
 from datetime import datetime, timedelta
 
 from database import init_db, AsyncSessionLocal
-from models import Driver, Hub, Delivery, HubBroadcast, DeliveryStatus, PackageSize, HubType, User, UserRole
+from models import (
+    Driver, Hub, Delivery, HubBroadcast, DeliveryStatus, PackageSize, HubType,
+    User, UserRole, Dispatcher, DeliveryBatch,
+)
 from auth import hash_password
 
 
@@ -51,27 +54,56 @@ RECIPIENT_NAMES = [
     "Ravi Teja", "Priyanka Das", "Mohan Lal", "Kavya Nair",
 ]
 
+# Realistic Hyderabad batch delivery data (address, lat, lng, customer details)
+BATCH_1_DELIVERIES = [
+    ("Flat 12B, Jubilee Hills Phase 2, Road 36, Hyderabad 500033", 17.4239, 78.4063, "Priya Sharma",    "priya.sharma@gmail.com",  "9876543210"),
+    ("Plot 55, Banjara Hills, Road 10, Hyderabad 500034",           17.4173, 78.4478, "Ravi Kumar",      "ravi.kumar@gmail.com",    "9876543211"),
+    ("H.No 22, Srinagar Colony, Ameerpet, Hyderabad 500016",        17.4317, 78.4488, "Deepa Nair",      "deepa.nair@gmail.com",    "9876543212"),
+    ("Flat 301, Vasavi Towers, Kondapur, Hyderabad 500084",         17.4601, 78.3540, "Suresh Babu",     "suresh.b@gmail.com",      "9876543213"),
+    ("Plot 88, Kavuri Hills, Madhapur, Hyderabad 500033",           17.4348, 78.3975, "Anita Singh",     "anita.singh@gmail.com",   "9876543214"),
+    ("Office 201, Cyber Towers, HITEC City, Hyderabad 500081",      17.4435, 78.3772, "Vikram Reddy",    "vikram.r@gmail.com",      "9876543215"),
+]
+
+BATCH_2_DELIVERIES = [
+    ("Flat 8A, My Home Hub, Hitech City, Hyderabad 500081",         17.4477, 78.3802, "Mohammed Ali",    "m.ali@gmail.com",         "9876543220"),
+    ("H.No 15, Gachibowli Village, Gachibowli, Hyderabad 500032",   17.4400, 78.3489, "Sunita Joshi",    "sunita.j@gmail.com",      "9876543221"),
+    ("Plot 12, Manikonda, Hyderabad 500089",                         17.4036, 78.3892, "Kiran Babu",      "kiran.b@gmail.com",       "9876543222"),
+    ("Flat 402, Aditya Heights, Gachibowli, Hyderabad 500032",      17.4420, 78.3510, "Meena Reddy",     "meena.r@gmail.com",       "9876543223"),
+    ("H.No 7, Tolichowki, Hyderabad 500008",                        17.4054, 78.4232, "Anil Kumar",      "anil.k@gmail.com",        "9876543224"),
+    ("Plot 33, Nanakramguda, Hyderabad 500032",                     17.4278, 78.3619, "Pooja Sharma",    "pooja.s@gmail.com",       "9876543225"),
+    ("Flat 201, Prestige Towers, Raidurgam, Hyderabad 500032",      17.4310, 78.3706, "Rajesh Verma",    "rajesh.v@gmail.com",      "9876543226"),
+    ("H.No 44, Puppalaguda, Hyderabad 500089",                      17.4100, 78.3780, "Kavya Nair",      "kavya.n@gmail.com",       "9876543227"),
+]
+
 
 async def seed():
     await init_db()
     async with AsyncSessionLocal() as db:
-        # Clear existing
         from sqlalchemy import text
+
+        # Clear in dependency order
         await db.execute(text("DELETE FROM hub_broadcasts"))
         await db.execute(text("DELETE FROM deliveries"))
+        await db.execute(text("DELETE FROM delivery_batches"))
+        await db.execute(text("DELETE FROM dispatchers"))
         await db.execute(text("DELETE FROM hubs"))
         await db.execute(text("DELETE FROM drivers"))
+        await db.execute(text("DELETE FROM users"))
         await db.commit()
 
-        # Seed drivers
+        # ── Seed drivers ──────────────────────────────────────────────────────
         drivers = []
-        for d in DRIVERS:
+        now = datetime.utcnow()
+        for i, d in enumerate(DRIVERS):
             driver = Driver(**d)
+            # First 3 drivers are "active" (pinged in last 5 minutes)
+            if i < 3:
+                driver.last_ping_at = now - timedelta(minutes=random.randint(1, 4))
             db.add(driver)
             drivers.append(driver)
         await db.flush()
 
-        # Seed hubs
+        # ── Seed hubs ─────────────────────────────────────────────────────────
         hubs = []
         for h in HUBS:
             hub = Hub(**h)
@@ -79,7 +111,7 @@ async def seed():
             hubs.append(hub)
         await db.flush()
 
-        # Seed deliveries (50 spread across today)
+        # ── Seed standalone deliveries (50 spread across today) ───────────────
         base_time = datetime.utcnow().replace(hour=7, minute=0, second=0, microsecond=0)
         statuses = (
             [DeliveryStatus.delivered] * 32 +
@@ -111,15 +143,7 @@ async def seed():
 
         await db.flush()
 
-        # Add broadcasts for failed deliveries
-        failed_result = await db.execute(
-            __import__("sqlalchemy", fromlist=["select"]).select(Delivery).where(Delivery.status == DeliveryStatus.failed)
-        )
-        failed_deliveries = failed_result.scalars().all()
-
-        import random as rnd
-        import string as st
-        # Guarantee driver 1 has an active delivery
+        # Guarantee driver 1 has an active en_route delivery
         guaranteed_delivery = Delivery(
             driver_id=1,
             address="Plot 42, Road No.12, Banjara Hills, Hyderabad - 500034",
@@ -133,7 +157,7 @@ async def seed():
         db.add(guaranteed_delivery)
 
         # Guarantee Hub 1 has an accepted broadcast (to show OTP)
-        guaranteed_failed_delivery = Delivery(
+        guaranteed_failed = Delivery(
             driver_id=2,
             address="Shop 7, Jubilee Hills Check Post, Hyderabad - 500033",
             status=DeliveryStatus.failed,
@@ -143,11 +167,11 @@ async def seed():
             recipient_name="Rahul Verma",
             order_id="ND10007",
         )
-        db.add(guaranteed_failed_delivery)
+        db.add(guaranteed_failed)
         await db.flush()
 
         broadcast = HubBroadcast(
-            delivery_id=guaranteed_failed_delivery.id,
+            delivery_id=guaranteed_failed.id,
             hub_id=1,
             pickup_code="847291",
             broadcast_at=datetime.utcnow() - timedelta(minutes=25),
@@ -156,52 +180,147 @@ async def seed():
         db.add(broadcast)
         hubs[0].today_earnings += 25.0
 
+        # Broadcasts for all failed standalone deliveries
+        failed_result = await db.execute(
+            __import__("sqlalchemy", fromlist=["select"]).select(Delivery).where(Delivery.status == DeliveryStatus.failed)
+        )
+        failed_deliveries = failed_result.scalars().all()
+        import string as st
         for fd in failed_deliveries:
             hub = random.choice(hubs)
-            import random as rnd
-            import string as st
-            code = "".join(rnd.choices(st.digits, k=6))
-            broadcast = HubBroadcast(
+            code = "".join(random.choices(st.digits, k=6))
+            db.add(HubBroadcast(
                 delivery_id=fd.id,
                 hub_id=hub.id,
                 pickup_code=code,
                 broadcast_at=fd.created_at + timedelta(minutes=2),
                 accepted_at=fd.created_at + timedelta(minutes=5),
-            )
+            ))
             hub.today_earnings += 25.0
-            db.add(broadcast)
 
         await db.commit()
 
-        # ── Seed Users ────────────────────────────────────────────────────────
-        from sqlalchemy import text
-        await db.execute(text("DELETE FROM users"))
+        # ── Seed dispatcher ───────────────────────────────────────────────────
+        dispatcher = Dispatcher(
+            name="Dispatch Admin",
+            email="dispatcher@neardrop.in",
+            password_hash=hash_password("dispatch123"),
+        )
+        db.add(dispatcher)
+        await db.flush()
+
+        # ── Seed batch 1: assigned to driver 1 (Arjun Reddy), mixed statuses ─
+        batch1 = DeliveryBatch(
+            batch_code="BATCH-20250331-001",
+            driver_id=drivers[0].id,
+            dispatcher_id=dispatcher.id,
+            total_deliveries=len(BATCH_1_DELIVERIES),
+            status="active",
+            assigned_at=datetime.utcnow().replace(hour=7, minute=30, second=0, microsecond=0),
+        )
+        db.add(batch1)
+        await db.flush()
+
+        batch1_statuses = [
+            DeliveryStatus.delivered,
+            DeliveryStatus.delivered,
+            DeliveryStatus.hub_delivered,
+            DeliveryStatus.en_route,
+            DeliveryStatus.en_route,
+            DeliveryStatus.en_route,
+        ]
+        for i, (addr, lat, lng, name, email, phone) in enumerate(BATCH_1_DELIVERIES):
+            status = batch1_statuses[i]
+            d_at = batch1.assigned_at + timedelta(minutes=30 * i + 25) if status == DeliveryStatus.delivered else None
+            db.add(Delivery(
+                driver_id=drivers[0].id,
+                batch_id=batch1.id,
+                address=addr,
+                status=status,
+                package_size=PackageSize.medium,
+                weight_kg=round(random.uniform(0.5, 5.0), 1),
+                created_at=batch1.assigned_at + timedelta(minutes=2),
+                delivered_at=d_at,
+                recipient_name=name,
+                customer_email=email,
+                customer_phone=phone,
+                order_id=f"ND2{100 + i:03d}",
+                queue_position=i + 1,
+                lat=lat,
+                lng=lng,
+            ))
+
+        # ── Seed batch 2: assigned to driver 2 (Priya Sharma), mostly pending ─
+        batch2 = DeliveryBatch(
+            batch_code="BATCH-20250331-002",
+            driver_id=drivers[1].id,
+            dispatcher_id=dispatcher.id,
+            total_deliveries=len(BATCH_2_DELIVERIES),
+            status="active",
+            assigned_at=datetime.utcnow().replace(hour=9, minute=0, second=0, microsecond=0),
+        )
+        db.add(batch2)
+        await db.flush()
+
+        batch2_statuses = [
+            DeliveryStatus.delivered,
+            DeliveryStatus.delivered,
+            DeliveryStatus.failed,
+            DeliveryStatus.en_route,
+            DeliveryStatus.en_route,
+            DeliveryStatus.en_route,
+            DeliveryStatus.en_route,
+            DeliveryStatus.en_route,
+        ]
+        for i, (addr, lat, lng, name, email, phone) in enumerate(BATCH_2_DELIVERIES):
+            status = batch2_statuses[i]
+            d_at = batch2.assigned_at + timedelta(minutes=20 * i + 18) if status == DeliveryStatus.delivered else None
+            db.add(Delivery(
+                driver_id=drivers[1].id,
+                batch_id=batch2.id,
+                address=addr,
+                status=status,
+                package_size=random.choice(list(PackageSize)),
+                weight_kg=round(random.uniform(0.3, 6.0), 1),
+                created_at=batch2.assigned_at + timedelta(minutes=2),
+                delivered_at=d_at,
+                recipient_name=name,
+                customer_email=email,
+                customer_phone=phone,
+                order_id=f"ND3{100 + i:03d}",
+                queue_position=i + 1,
+                lat=lat,
+                lng=lng,
+            ))
+
         await db.commit()
 
-        driver_password = hash_password("driver123")
-        hub_password = hash_password("hub123")
+        # ── Seed users ────────────────────────────────────────────────────────
+        driver_pw = hash_password("driver123")
+        hub_pw = hash_password("hub123")
 
         seed_users = [
-            # Drivers — phones 9000000001-3 linked to first 3 driver rows
-            User(phone="9000000001", hashed_password=driver_password, role=UserRole.driver,
+            User(phone="9000000001", hashed_password=driver_pw, role=UserRole.driver,
                  name="Arjun Reddy",     driver_id=drivers[0].id),
-            User(phone="9000000002", hashed_password=driver_password, role=UserRole.driver,
+            User(phone="9000000002", hashed_password=driver_pw, role=UserRole.driver,
                  name="Priya Sharma",    driver_id=drivers[1].id),
-            User(phone="9000000003", hashed_password=driver_password, role=UserRole.driver,
+            User(phone="9000000003", hashed_password=driver_pw, role=UserRole.driver,
                  name="Mohammed Farhan", driver_id=drivers[2].id),
-            # Hub owners — phones 9000000004-6 linked to first 3 hub rows
-            User(phone="9000000004", hashed_password=hub_password, role=UserRole.hub_owner,
+            User(phone="9000000004", hashed_password=hub_pw, role=UserRole.hub_owner,
                  name="Ramesh Kumar",   hub_id=hubs[0].id),
-            User(phone="9000000005", hashed_password=hub_password, role=UserRole.hub_owner,
+            User(phone="9000000005", hashed_password=hub_pw, role=UserRole.hub_owner,
                  name="Latha Devi",     hub_id=hubs[1].id),
-            User(phone="9000000006", hashed_password=hub_password, role=UserRole.hub_owner,
+            User(phone="9000000006", hashed_password=hub_pw, role=UserRole.hub_owner,
                  name="Dr. Venkat Rao", hub_id=hubs[2].id),
         ]
         for u in seed_users:
             db.add(u)
         await db.commit()
 
-        print("Seed complete: 5 drivers, 8 hubs, 50 deliveries, 6 users")
+        print(
+            "Seed complete: 5 drivers, 8 hubs, 50 standalone deliveries, "
+            "1 dispatcher, 2 batches (6+8 deliveries), 6 users"
+        )
 
 
 if __name__ == "__main__":

@@ -80,3 +80,48 @@ async def get_current_user_optional(
         return await get_current_user(credentials, db)
     except HTTPException:
         return None
+
+
+async def get_current_dispatcher(
+    credentials: Optional[HTTPAuthorizationCredentials] = Security(bearer_scheme),
+    db: AsyncSession = Depends(get_db),
+):
+    """Dependency that validates JWT and returns the Dispatcher ORM object."""
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+        )
+    payload = decode_token(credentials.credentials)
+    if payload.get("role") != "dispatcher":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Dispatcher access required",
+        )
+    dispatcher_id = payload.get("sub")
+    if dispatcher_id is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+
+    from models import Dispatcher
+    result = await db.execute(select(Dispatcher).where(Dispatcher.id == int(dispatcher_id)))
+    dispatcher = result.scalar_one_or_none()
+    if dispatcher is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Dispatcher not found")
+    return dispatcher
+
+
+def require_role(required_role: str):
+    """Dependency factory: checks that the JWT role matches required_role."""
+    async def _checker(
+        credentials: Optional[HTTPAuthorizationCredentials] = Security(bearer_scheme),
+    ) -> dict:
+        if credentials is None:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+        payload = decode_token(credentials.credentials)
+        if payload.get("role") != required_role:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Access denied: {required_role} role required",
+            )
+        return payload
+    return _checker
