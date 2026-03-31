@@ -1,14 +1,14 @@
 """
 Seed script — generates realistic mock data for Hyderabad.
-Run: python -m backend.seed
+Run from backend/: python seed.py
 """
 import asyncio
 import random
 from datetime import datetime, timedelta
 
-from backend.database import init_db, AsyncSessionLocal
-from backend.models import Driver, Hub, Delivery, HubBroadcast, DeliveryStatus, PackageSize, HubType, User, UserRole
-from backend.auth import hash_password
+from database import init_db, AsyncSessionLocal
+from models import Driver, Hub, Delivery, HubBroadcast, DeliveryStatus, PackageSize, HubType, User, UserRole
+from auth import hash_password
 
 
 DRIVERS = [

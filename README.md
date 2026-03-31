@@ -1,220 +1,260 @@
-# NearDrop — Intelligent Last-Mile Delivery Recovery Network
+# NearDrop — Intelligent Last-Mile Delivery Recovery
 
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.110-009688?style=flat&logo=fastapi)](https://fastapi.tiangolo.com)
-[![React](https://img.shields.io/badge/React-18-61DAFB?style=flat&logo=react)](https://react.dev)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-PostGIS-336791?style=flat&logo=postgresql)](https://postgis.net)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-
-> **30–40% of last-mile deliveries fail on the first attempt.** Every retry costs fuel, driver time, and customer trust — yet no affordable solution exists for the SME operators who handle the majority of urban deliveries in emerging markets. NearDrop is that solution.
-
-NearDrop is a three-layer intelligent recovery platform that intercepts failed deliveries in real time, broadcasts them to a geo-proximate network of community micro-hubs, and builds a verifiable trust record for every actor in the delivery chain — turning operational data into financial infrastructure.
-
----
-
-## Core Concept
-
-Traditional last-mile platforms treat a failed delivery as a terminal event: log it, schedule a retry, burn fuel twice. NearDrop inverts this model. A failure event is a **trigger** — it activates a real-time geospatial marketplace where nearby community nodes (kirana stores, pharmacies, apartment receptions) compete to accept the package as a secure intermediate drop point.
-
-The three pillars that make this work:
-
-**1. DriverOS — Voice-First Delivery Interface**
-Delivery drivers in dense urban markets are on bikes, in traffic, under time pressure. NearDrop's driver interface is voice-forward by design. Using OpenAI Whisper for offline-capable speech recognition, drivers report delivery status, request navigation, and trigger hub-drops entirely by voice in their local language (Hindi, Telugu, Tamil). No screen interaction while moving. The system uses intent classification to parse commands like *"customer nahi hai"* and autonomously initiates the recovery flow.
-
-**2. DeadMile Engine — Geospatial Hub Broadcast**
-On a failure event, the DeadMile Engine executes a PostGIS radius query to find all available registered hubs within 500m of the failed delivery point. It broadcasts the package offer via Redis pub/sub to hub owner devices over WebSocket. The first hub to accept receives the package assignment; the driver gets a rerouted drop point within 60 seconds. The customer receives an SMS pickup code. Zero retry trips. Zero dead miles.
-
-**3. Trust Score Engine — Reputation as Financial Infrastructure**
-Every delivery event — on-time rate, first-attempt success, hub acceptance rate, dispute history — feeds a weighted rolling score for drivers, hub owners, and courier operators. This score is not a gamification layer. It is a structured, portable reputation asset. An operator with 12 months of NearDrop score history holds a verifiable track record that can be presented to fleet insurers, logistics aggregators, and trade credit providers — directly addressing the financial exclusion of SME operators in emerging markets.
-
-**Carbon Ledger (ESG Layer)**
-Each hub reroute eliminates a retry trip. NearDrop calculates the distance delta per rerouting event and multiplies by IPCC emission factors per vehicle class, generating an auditable CO₂ saving logged at the transaction level. Operators receive weekly carbon reports — not as a dashboard feature, but as a byproduct of the core mechanic.
-
----
-
-## System Architecture
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        CLIENT LAYER                             │
-│  Driver PWA (voice-first)  │  Hub App  │  Operator Dashboard    │
-└───────────────┬─────────────────────────────────────────────────┘
-                │ REST + WebSocket
-┌───────────────▼─────────────────────────────────────────────────┐
-│                       SERVER LAYER (FastAPI)                     │
-│                                                                  │
-│  ┌─────────────┐  ┌──────────────┐  ┌──────────┐  ┌─────────┐  │
-│  │ Delivery API│  │ DeadMile     │  │  Trust   │  │ Carbon  │  │
-│  │ (REST)      │  │ Engine       │  │  Score   │  │ Ledger  │  │
-│  └──────┬──────┘  └──────┬───────┘  └────┬─────┘  └────┬────┘  │
-│         │                │               │              │        │
-│  ┌──────▼────────────────▼───────────────▼──────────────▼─────┐ │
-│  │              WebSocket Manager + Redis Pub/Sub              │ │
-│  └─────────────────────────────────────────────────────────────┘ │
-└───────────────┬─────────────────────────────────────────────────┘
-                │ SQLAlchemy ORM
-┌───────────────▼──────────────┐   ┌────────────────────────────┐
-│   PostgreSQL + PostGIS       │   │  External Services          │
-│   (Geospatial queries,       │   │  Whisper STT (on-device)    │
-│    delivery state,           │   │  OSM Nominatim (geocoding)  │
-│    trust scores,             │   │  Twilio (SMS pickup codes)  │
-│    carbon ledger)            │   └────────────────────────────┘
-└──────────────────────────────┘
-```
-
----
-
-## Tech Stack
-
-| Layer | Technology | Rationale |
-|---|---|---|
-| Backend framework | FastAPI (Python 3.11) | Async-native, auto-generated OpenAPI docs, WebSocket support |
-| ORM | SQLAlchemy 2.0 | Async session support, clean migration path |
-| Database | PostgreSQL 15 + PostGIS | Native geospatial radius queries for hub matching |
-| Realtime | WebSocket + Redis pub/sub | Sub-100ms hub broadcast delivery |
-| Voice STT | OpenAI Whisper (base model) | Offline-capable, multilingual, no API cost |
-| Intent classification | Custom lightweight NLP (spaCy) | Low-latency local inference, no external dependency |
-| TTS | gTTS / pyttsx3 | Multilingual spoken responses for driver copilot |
-| Frontend | React 18 + Vite | Fast HMR, component-based PWA architecture |
-| Styling | Tailwind CSS | Utility-first, mobile-first design system |
-| Maps | Leaflet.js + OSM tiles | Open-source, no API key, offline tile support |
-| Charts | Recharts | Declarative, composable analytics components |
-| Geocoding | OSM Nominatim | Free, self-hostable, no usage limits |
-| SMS | Twilio API | Pickup code delivery to customers |
-| Local dev DB | SQLite (fallback) | Zero-config quick setup for development |
-
----
-
-## Data Models
-
-**Core entities and their relationships:**
-```
-Delivery ──────────────── Driver (Many-to-One)
-    │                         │
-    │ on failure               │ contributes to
-    ▼                         ▼
-HubBroadcast ──────── TrustScoreEvent
-    │
-    ▼
-HubDrop ──────────── Hub (Many-to-One)
-    │
-    ▼
-CarbonEvent (distance_delta_km, co2_saved_kg, vehicle_class)
-```
-
-**TrustScore computation (rolling weighted average):**
-```
-score = Σ (event_weight × outcome_value) / Σ event_weight
-        over last N events (default N=100)
-
-event_weight = recency_decay(days_ago) × event_type_weight
-event_type_weight: { first_attempt_success: 1.0, hub_drop: 0.8,
-                     on_time: 0.6, dispute_resolved: 1.2 }
-```
+NearDrop intercepts failed deliveries in real time and broadcasts them to a geo-proximate network of community micro-hubs (kirana stores, pharmacies, apartment receptions). When a driver marks a delivery as failed, the DeadMile Engine finds available hubs within 2 km, broadcasts the package offer over WebSocket, and reroutes the driver to the first accepting hub — eliminating retry trips and building a verifiable trust record for every actor in the chain.
 
 ---
 
 ## Project Structure
+
 ```
 NearDrop/
-├── backend/
-│   ├── main.py                    # FastAPI app factory, middleware, router registry
-│   ├── models.py                  # SQLAlchemy models (Delivery, Driver, Hub, TrustScore, CarbonEvent)
-│   ├── schemas.py                 # Pydantic v2 request/response schemas
-│   ├── websocket_manager.py       # Connection registry, room-based broadcast, Redis pub/sub bridge
-│   ├── seed.py                    # Hyderabad-context mock data generator
-│   └── routes/
-│       ├── delivery.py            # Delivery lifecycle endpoints + failure trigger
-│       ├── hubs.py                # Geospatial hub query, broadcast, acceptance handshake
-│       ├── drivers.py             # Driver state, trust score retrieval
-│       ├── dashboard.py           # Aggregate fleet metrics, carbon totals
-│       └── voice.py               # Whisper transcription endpoint, intent classification
-├── frontend/
-│   ├── src/
-│   │   ├── pages/
-│   │   │   ├── DriverPWA.jsx      # Voice-first mobile interface
-│   │   │   ├── HubApp.jsx         # Single-screen accept/reject + pickup code display
-│   │   │   └── Dashboard.jsx      # Fleet map, analytics, driver leaderboard
-│   │   ├── hooks/
-│   │   │   ├── useVoice.js        # Whisper integration, MediaRecorder, intent parsing
-│   │   │   └── useSocket.js       # WebSocket lifecycle, reconnect logic, event dispatch
-│   │   └── components/
-│   │       ├── LeafletMap.jsx     # Fleet map with driver/hub pins, status color coding
-│   │       ├── MicButton.jsx      # Animated voice capture component
-│   │       ├── TrustBadge.jsx     # Score display with trend indicator
-│   │       └── HubBroadcastCard.jsx # Incoming package offer card for hub owners
-└── neardrop.db                    # SQLite fallback for local development
+├── backend/                        # FastAPI backend
+│   ├── routes/                     # Auth, delivery, hubs, driver, dashboard, voice
+│   ├── services/                   # Azure Maps, Azure SMS, Firebase FCM
+│   ├── models.py                   # SQLAlchemy ORM models
+│   ├── schemas.py                  # Pydantic v2 request/response schemas
+│   ├── database.py                 # Async SQLAlchemy engine + session
+│   ├── auth.py                     # JWT creation/validation, bcrypt hashing
+│   ├── websocket_manager.py        # In-memory WebSocket connection registry
+│   ├── main.py                     # FastAPI app factory, middleware, routers
+│   ├── seed.py                     # Hyderabad mock data (5 drivers, 8 hubs, 50 deliveries)
+│   ├── requirements.txt
+│   ├── Dockerfile
+│   └── startup.sh
+├── mobile/                         # Flutter mobile app (BLoC + feature-first)
+│   ├── lib/
+│   │   ├── core/                   # Config, theme, network, DI, storage
+│   │   ├── features/               # auth/, driver/, hub/
+│   │   └── shared/                 # Widgets, models
+│   ├── android/
+│   ├── assets/
+│   ├── pubspec.yaml
+│   └── pubspec.lock
+├── .env.example                    # All environment variables with comments
+├── .gitignore
+├── docker-compose.yml              # Backend + PostgreSQL for local Docker dev
+└── README.md
 ```
 
 ---
 
-## API Reference
+## Prerequisites
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/delivery/fail` | Marks delivery failed, triggers DeadMile broadcast |
-| `GET` | `/hubs/nearby` | PostGIS radius query — returns available hubs within `radius` metres |
-| `POST` | `/hub/accept` | Hub accepts package — generates pickup code, notifies driver |
-| `GET` | `/driver/{id}/score` | Returns trust score breakdown and recent delivery history |
-| `GET` | `/dashboard/stats` | Aggregate metrics — deliveries, success rate, CO₂ saved |
-| `GET` | `/dashboard/fleet` | Live driver positions and delivery statuses |
-| `POST` | `/voice/transcribe` | Accepts audio blob, returns transcribed text + classified intent |
-| `WS` | `/ws/{client_id}` | WebSocket connection for real-time fleet and hub updates |
+| Tool | Version |
+|---|---|
+| Python | 3.11+ |
+| Flutter | 3.19.0+ |
+| Dart SDK | 3.3.0+ |
+| Docker + Docker Compose | Latest stable |
+| Android SDK | API 21+ (for mobile) |
 
 ---
 
-## Getting Started
+## Quick Start — Local Development
 
-### Prerequisites
-- Python 3.11+
-- Node.js 18+
-- PostgreSQL 15 with PostGIS extension (or use SQLite for local dev)
-- Redis (for pub/sub in multi-worker deployments)
+### 1. Clone and configure environment
 
-### Backend
+```bash
+git clone https://github.com/your-org/neardrop.git
+cd NearDrop
+cp .env.example .env
+```
+
+Open `.env` and fill in at minimum:
+```
+JWT_SECRET_KEY=<generate with: python -c "import secrets; print(secrets.token_hex(32))">
+```
+All other values are optional for local dev — Azure and Firebase services degrade gracefully if keys are missing.
+
+---
+
+### 2. Backend setup
+
+#### Option A: Docker (recommended — includes PostgreSQL)
+
+```bash
+docker compose up --build
+```
+
+The API will be available at `http://localhost:8000`.
+API docs (Swagger UI) at `http://localhost:8000/docs`.
+
+To seed mock data into the running container:
+```bash
+docker compose exec backend python seed.py
+```
+
+#### Option B: Manual (SQLite, no Docker required)
+
 ```bash
 cd backend
-python -m venv venv && source venv/bin/activate
+python -m venv venv
+source venv/bin/activate          # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
-# For PostgreSQL + PostGIS (recommended)
-export DATABASE_URL="postgresql+asyncpg://user:pass@localhost/neardrop"
+# Copy and configure environment
+cp ../.env.example ../.env
 
-# Run migrations and seed Hyderabad mock data
-python -m seed
+# Seed Hyderabad mock data
+python seed.py
 
-# Start server
+# Start dev server
 uvicorn main:app --reload --port 8000
 ```
 
-API docs available at `http://localhost:8000/docs`
+API available at `http://localhost:8000`. Swagger UI at `http://localhost:8000/docs`.
 
-### Frontend
+---
+
+### 3. Azure credentials — where to get them
+
+All Azure keys go in your root `.env` file. Every service degrades gracefully if the key is missing, so you only need to configure what you actually use.
+
+| Variable | Service | Where to find it |
+|---|---|---|
+| `AZURE_SPEECH_KEY` | Azure Cognitive Services — Speech | portal.azure.com → your Speech resource → **Keys and Endpoint** |
+| `AZURE_SPEECH_REGION` | Azure Cognitive Services — Speech | Same page, e.g. `eastus` or `centralindia` |
+| `AZURE_MAPS_SUBSCRIPTION_KEY` | Azure Maps | portal.azure.com → your Maps account → **Authentication** tab |
+| `AZURE_COMMUNICATION_CONNECTION_STRING` | Azure Communication Services (SMS) | portal.azure.com → your ACS resource → **Keys** |
+| `AZURE_COMMUNICATION_SENDER_PHONE` | Azure Communication Services (SMS) | portal.azure.com → your ACS resource → **Phone numbers** |
+
+---
+
+### 4. Firebase setup (push notifications)
+
+Push notifications are optional. The app works without Firebase — FCM calls are fire-and-forget.
+
+1. Go to [console.firebase.google.com](https://console.firebase.google.com) and create a project.
+2. Add an **Android app** with package name `com.neardrop.app`.
+3. Download `google-services.json` and place it at `mobile/android/app/google-services.json`.
+4. In Project Settings → **Service Accounts** → click **Generate new private key**.
+5. Open the downloaded JSON file, copy the entire contents, and paste it as a single-line string into `.env`:
+   ```
+   FIREBASE_SERVICE_ACCOUNT_JSON={"type":"service_account","project_id":"..."}
+   ```
+
+---
+
+### 5. Flutter mobile app setup
+
 ```bash
-cd frontend
-npm install
-npm run dev
+cd mobile
+flutter pub get
 ```
 
-| Interface | Route |
+**Configure the backend URL** in `mobile/lib/core/config/app_config.dart`:
+
+| Scenario | Value for `baseUrl` |
 |---|---|
-| Driver PWA | `http://localhost:5173/driver` |
-| Hub Owner App | `http://localhost:5173/hub` |
-| Operator Dashboard | `http://localhost:5173/dashboard` |
+| Android emulator (default) | `http://10.0.2.2:8000` |
+| Physical device on same WiFi | `http://192.168.X.X:8000` (your machine's LAN IP) |
+| Production | `https://neardrop-api.azurewebsites.net` |
+
+Run on a connected device or emulator:
+```bash
+flutter run
+```
 
 ---
 
-## Scalability Path
+### 6. Test credentials (seeded)
 
-| Scale tier | Configuration |
-|---|---|
-| **Development** | SQLite + in-process WebSocket, single Uvicorn worker |
-| **Pilot (1–10 operators)** | PostgreSQL + PostGIS, Redis pub/sub, 2–4 Uvicorn workers |
-| **City scale (100+ operators)** | Docker + AWS ECS / GCP Cloud Run, managed RDS, ElastiCache Redis |
-| **Multi-city** | Multi-region deployment, per-city PostGIS schemas, centralised trust score aggregation |
+Run `python seed.py` (or `docker compose exec backend python seed.py`) to populate the database, then log in with:
 
-The geospatial hub query is the only latency-sensitive operation at scale. PostGIS `ST_DWithin` with a GIST index on hub coordinates handles 10,000+ hub lookups per second on standard hardware — no architectural changes required to scale from one city to ten.
+| Role | Phone | Password |
+|---|---|---|
+| Driver | 9000000001 | driver123 |
+| Driver | 9000000002 | driver123 |
+| Driver | 9000000003 | driver123 |
+| Hub Owner | 9000000004 | hub123 |
+| Hub Owner | 9000000005 | hub123 |
+| Hub Owner | 9000000006 | hub123 |
+
+Hub owner `9000000004` (Sri Ram Kirana Store) has a pre-accepted broadcast with pickup code **847291**.
 
 ---
 
-## License
+## Deployment — Azure App Service
 
-MIT License — see [LICENSE](LICENSE) for details.
+### 1. Build and push the Docker image
+
+```bash
+# Log in to Azure Container Registry
+az acr login --name <your-registry-name>
+
+# Build and tag
+docker build -t <your-registry-name>.azurecr.io/neardrop-backend:latest ./backend
+
+# Push
+docker push <your-registry-name>.azurecr.io/neardrop-backend:latest
+```
+
+### 2. Deploy to App Service
+
+```bash
+az webapp create \
+  --resource-group <your-rg> \
+  --plan <your-plan> \
+  --name neardrop-api \
+  --deployment-container-image-name <your-registry-name>.azurecr.io/neardrop-backend:latest
+```
+
+### 3. Set environment variables
+
+In the Azure Portal: **App Service → Configuration → Application settings**, add every variable from `.env.example` with your production values.
+
+Or via CLI:
+```bash
+az webapp config appsettings set \
+  --resource-group <your-rg> \
+  --name neardrop-api \
+  --settings DATABASE_URL="postgresql+asyncpg://..." JWT_SECRET_KEY="..." ...
+```
+
+---
+
+## Architecture
+
+```mermaid
+graph TD
+    A[Flutter Mobile App] -->|REST + JWT| B[FastAPI Backend]
+    A -->|WebSocket /ws| B
+    B --> C[(SQLite / PostgreSQL)]
+    B --> D[Azure Speech Services]
+    B --> E[Azure Maps]
+    B --> F[Azure Communication Services]
+    B --> G[Firebase FCM]
+    B --> H[WebSocket Manager\nin-memory broadcast]
+```
+
+### Key design decisions
+
+| Decision | Current implementation | Production path |
+|---|---|---|
+| Database | SQLite (dev) / PostgreSQL (prod) | Azure PostgreSQL Flexible Server |
+| Geosearch | Haversine in Python, loads all hubs | PostGIS `ST_DWithin` with GIST index |
+| WebSocket | In-memory `ConnectionManager` | Redis pub/sub (multi-worker safe) |
+| Auth | JWT, 30-day expiry, bcrypt passwords | Same — no changes needed |
+| Push notifications | Firebase FCM, fire-and-forget | Same |
+
+### API routes
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/auth/login` | Phone + password login, returns JWT |
+| `GET` | `/auth/me` | Current user profile |
+| `GET` | `/driver/{id}/score` | Trust score + recent delivery history |
+| `GET` | `/driver/{id}/active_delivery` | Current active delivery |
+| `POST` | `/driver/fcm-token` | Register device push token |
+| `POST` | `/delivery/fail` | Mark delivery failed, trigger hub broadcast |
+| `POST` | `/delivery/{id}/complete` | Mark delivery as delivered |
+| `GET` | `/hubs/nearby` | Hubs within radius of coordinates |
+| `GET` | `/hubs/{id}/active_broadcasts` | Pending broadcasts for a hub |
+| `POST` | `/hub/accept` | Accept a broadcast, receive pickup code |
+| `GET` | `/dashboard/stats` | Fleet-wide stats and CO₂ saved |
+| `GET` | `/dashboard/fleet` | All driver positions and statuses |
+| `GET` | `/dashboard/hourly` | Hourly delivery/failure counts |
+| `GET` | `/dashboard/leaderboard` | Drivers ranked by completions + trust |
+| `POST` | `/voice/azure-token` | Short-lived Azure Speech token for Flutter |
+| `WS` | `/ws` | Real-time delivery events |
+| `GET` | `/health` | Health check |

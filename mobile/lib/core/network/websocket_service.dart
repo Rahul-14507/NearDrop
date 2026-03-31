@@ -26,7 +26,7 @@ class WebSocketService {
 
   void _connect() {
     try {
-      final uri = Uri.parse('${AppConfig.wsUrl}/ws?token=${_token ?? ""}');
+      final uri = Uri.parse('${AppConfig.wsBaseUrl}/ws?token=${_token ?? ""}');
       _channel = WebSocketChannel.connect(uri);
       _channel!.stream.listen(
         (data) {
@@ -48,7 +48,7 @@ class WebSocketService {
       );
       _reconnectDelay = 1;
       _startPing();
-      debugPrint('WS connected to ${AppConfig.wsUrl}');
+      debugPrint('WS connected to ${AppConfig.wsBaseUrl}');
     } catch (e) {
       debugPrint('WS connect error: $e');
       _scheduleReconnect();

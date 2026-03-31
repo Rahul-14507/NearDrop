@@ -3,9 +3,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from datetime import datetime, date, timedelta
 
-from backend.database import get_db
-from backend.models import Driver, Delivery, DeliveryStatus, HubBroadcast
-from backend.schemas import DashboardStats, FleetDriver, HourlyMetric, LeaderboardEntry
+from database import get_db
+from models import Driver, Delivery, DeliveryStatus, HubBroadcast
+from schemas import DashboardStats, FleetDriver, HourlyMetric, LeaderboardEntry
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 

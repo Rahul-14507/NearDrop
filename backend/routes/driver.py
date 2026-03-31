@@ -5,10 +5,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from backend.auth import get_current_user
-from backend.database import get_db
-from backend.models import Driver, Delivery, DeliveryStatus, User
-from backend.schemas import DriverScore, DeliveryOut, FCMTokenRequest
+from auth import get_current_user
+from database import get_db
+from models import Driver, Delivery, DeliveryStatus, User
+from schemas import DriverScore, DeliveryOut, FCMTokenRequest
 
 router = APIRouter(prefix="/driver", tags=["driver"])
 

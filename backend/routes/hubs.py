@@ -10,10 +10,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 
-from backend.database import get_db
-from backend.services import fcm as fcm_service
-from backend.models import Hub, HubBroadcast, Delivery
-from backend.schemas import HubOut, HubAcceptRequest, HubAcceptResponse, HubStats, HubBroadcastOut, DeliveryOut
+from database import get_db
+from services import fcm as fcm_service
+from models import Hub, HubBroadcast, Delivery
+from schemas import HubOut, HubAcceptRequest, HubAcceptResponse, HubStats, HubBroadcastOut, DeliveryOut
 
 router = APIRouter(tags=["hubs"])
 
@@ -148,7 +148,7 @@ async def accept_broadcast(req: HubAcceptRequest, db: AsyncSession = Depends(get
 
     # Fire-and-forget FCM push to driver when hub accepts
     if broadcast:
-        from backend.models import Delivery, Driver
+        from models import Delivery, Driver
         delivery_result = await db.execute(select(Delivery).where(Delivery.id == broadcast.delivery_id))
         delivery = delivery_result.scalar_one_or_none()
         if delivery:

@@ -6,8 +6,8 @@ import os
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
 
-from backend.auth import get_current_user
-from backend.models import User
+from auth import get_current_user
+from models import User
 
 logger = logging.getLogger(__name__)
 

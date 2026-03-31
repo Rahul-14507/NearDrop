@@ -8,11 +8,11 @@ from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from backend.database import init_db
-from backend.websocket_manager import manager
-from backend.routes import delivery, hubs, driver, dashboard
-from backend.routes import auth as auth_router
-from backend.routes import voice as voice_router
+from database import init_db
+from websocket_manager import manager
+from routes import delivery, hubs, driver, dashboard
+from routes import auth as auth_router
+from routes import voice as voice_router
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +65,7 @@ async def jwt_middleware(request: Request, call_next):
 
     token = auth_header[7:]
     try:
-        from backend.auth import decode_token
+        from auth import decode_token
         decode_token(token)
     except Exception:
         return JSONResponse(

@@ -1,23 +1,25 @@
+// HOW TO CONFIGURE:
+// 1. For local dev: keep baseUrl as 10.0.2.2:8000 (Android emulator)
+//    For physical device: change to your machine's local IP e.g. http://192.168.1.5:8000
+// 2. For production: change baseUrl to your Azure App Service URL
+// 3. Azure Maps key: get from portal.azure.com → your Maps account → Authentication tab
+// 4. Azure Speech key is NOT stored here — it is fetched securely from the backend at runtime
+
 class AppConfig {
-  AppConfig._();
+  // ── Backend ──────────────────────────────────────────────
+  // Change this to your Azure App Service URL in production
+  // e.g. https://neardrop-api.azurewebsites.net
+  static const String baseUrl = 'http://10.0.2.2:8000'; // Android emulator localhost
+  static const String wsBaseUrl = 'ws://10.0.2.2:8000'; // WebSocket base
 
-  static const String baseUrl = String.fromEnvironment(
-    'API_BASE_URL',
-    defaultValue: 'http://10.0.2.2:8000',
-  );
+  // ── Azure Maps ───────────────────────────────────────────
+  // portal.azure.com → Azure Maps Account → Authentication
+  static const String azureMapsKey = 'PASTE_YOUR_AZURE_MAPS_KEY_HERE';
 
-  static const String wsUrl = String.fromEnvironment(
-    'WS_BASE_URL',
-    defaultValue: 'ws://10.0.2.2:8000',
-  );
+  // ── Azure Speech ─────────────────────────────────────────
+  // Not stored here — Flutter fetches a short-lived token from
+  // POST /voice/azure-token on the backend. No key in Flutter code.
 
-  static const String azureMapsKey = String.fromEnvironment(
-    'AZURE_MAPS_KEY',
-    defaultValue: '',
-  );
-
-  static const String azureSpeechRegion = String.fromEnvironment(
-    'AZURE_SPEECH_REGION',
-    defaultValue: 'eastus',
-  );
+  // ── Environment ──────────────────────────────────────────
+  static const bool isProduction = false;
 }

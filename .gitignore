@@ -1,41 +1,51 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-.venv/
+# ─── Python ─────────────────────────────────────────────────
 venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
+dist/
+.venv/
 ENV/
 env/
+
+# ─── Environment ────────────────────────────────────────────
 .env
+*.env
+
+# ─── Database ───────────────────────────────────────────────
 *.db
 *.sqlite3
+neardrop.db
 
-# Node / React
-node_modules/
-dist/
-dist-ssr/
-*.local
-.eslintcache
+# ─── Flutter ────────────────────────────────────────────────
+mobile/.dart_tool/
+mobile/build/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
 
-# Logs
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-*.log
+# ─── Android ────────────────────────────────────────────────
+mobile/android/.gradle/
+mobile/android/local.properties
+mobile/android/app/google-services.json
 
-# IDEs / OS
+# ─── IDE ────────────────────────────────────────────────────
 .vscode/
 .idea/
+*.iml
 .DS_Store
 Thumbs.db
 
-# Build
-build/
+# ─── Docker ─────────────────────────────────────────────────
+.dockerignore
+
+# ─── Logs ───────────────────────────────────────────────────
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ─── Build artifacts ────────────────────────────────────────
 bin/
 obj/
-
-# NearDrop specific
-/backend/neardrop.db
-/backend/__pycache__/
-/frontend/node_modules/
-/frontend/dist/
