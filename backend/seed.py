@@ -201,7 +201,7 @@ async def seed():
             db.add(u)
         await db.commit()
 
-        print("✅ Seed complete: 5 drivers, 8 hubs, 50 deliveries, 6 users")
+        print("Seed complete: 5 drivers, 8 hubs, 50 deliveries, 6 users")
 
 
 if __name__ == "__main__":

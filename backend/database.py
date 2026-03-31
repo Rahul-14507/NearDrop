@@ -19,5 +19,5 @@ async def get_db():
 
 async def init_db():
     async with engine.begin() as conn:
-        from backend import models  # noqa: F401
+        import models  # noqa: F401
         await conn.run_sync(Base.metadata.create_all)

@@ -2,6 +2,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:neardrop/features/driver/bloc/delivery_event.dart';
 import 'package:neardrop/features/driver/bloc/delivery_state.dart';
 import 'package:neardrop/features/driver/repository/driver_repository.dart';
+import 'package:neardrop/features/driver/models/delivery_model.dart';
 
 class DeliveryBloc extends Bloc<DeliveryEvent, DeliveryState> {
   final DriverRepository _repository;

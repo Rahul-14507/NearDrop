@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(venvScriptspip install:*)",
+      "Bash(venvScriptspip uninstall:*)",
+      "Bash(venv/Scripts/pip install:*)",
+      "Bash(venv/Scripts/pip uninstall:*)",
+      "Bash(venv/Scripts/python seed.py)"
+    ]
+  }
+}
