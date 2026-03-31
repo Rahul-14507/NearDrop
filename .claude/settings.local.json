@@ -23,7 +23,10 @@
       "Bash(cmd /c \"ipconfig\")",
       "Bash(powershell -Command \"Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notlike ''127.*'' -and $_.IPAddress -notlike ''169.*'' } | Select-Object IPAddress, InterfaceAlias | Format-Table -AutoSize\")",
       "Bash(git rm:*)",
-      "Bash(xargs grep:*)"
+      "Bash(xargs grep:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ]
   }
 }
