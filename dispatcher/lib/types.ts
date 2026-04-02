@@ -65,7 +65,7 @@ export interface DeliveryBatch {
   dispatcher_id: number
   assigned_at: string
   total_deliveries: number
-  status: 'active' | 'completed'
+  status: 'active' | 'completed' | 'accepted' | 'rejected'
   delivered_count: number
   failed_count: number
   pending_count: number
@@ -90,6 +90,43 @@ export interface DispatcherStats {
   pending_today: number
   success_rate_percent: number
   co2_saved_kg: number
+  active_hubs: number
+}
+
+// ─── Hub ─────────────────────────────────────────────────────────────────────
+
+export type HubType = 'kirana' | 'pharmacy' | 'apartment' | 'other'
+
+export interface DispatcherHub {
+  id: number
+  name: string
+  lat: number
+  lng: number
+  hub_type: HubType
+  is_active: boolean
+  trust_score: number
+  total_drops_all_time: number
+  today_drops: number
+  today_earnings_inr: number
+  current_packages_held: number
+  owner_phone: string | null
+}
+
+export interface RegisterHubRequest {
+  name: string
+  address: string
+  lat?: number
+  lng?: number
+  hub_type: HubType
+  owner_phone?: string
+}
+
+export interface HubDropHistoryItem {
+  delivery_id: number
+  order_id: string
+  address: string
+  accepted_at: string | null
+  pickup_code: string | null
 }
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────

@@ -55,7 +55,7 @@ export default function DeliveriesPage() {
     <div className="p-6 space-y-4">
       <div>
         <h1 className="text-xl font-bold text-white">All Deliveries</h1>
-        <p className="text-slate-400 text-sm mt-0.5">{filtered.length} of {deliveries.length} deliveries today</p>
+        <p className="text-slate-400 text-sm mt-0.5">{filtered.length} of {deliveries.length} deliveries (last 7 days)</p>
       </div>
 
       {/* Filter bar */}

@@ -112,7 +112,9 @@ class _HubHomeScreenState extends State<HubHomeScreen> {
                       ? state.stats.trustScore
                       : state is HubBroadcastsLoaded
                           ? state.trustScore
-                          : 0;
+                          : state is HubLoading
+                              ? (state.stats?.trustScore ?? 0)
+                              : 0;
                   return Padding(
                     padding: const EdgeInsets.only(right: 12),
                     child: TrustScoreBadge(score: score),

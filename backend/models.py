@@ -48,6 +48,7 @@ class Driver(Base):
     vehicle = Column(String(50))
     fcm_token = Column(String(255), nullable=True)
     last_ping_at = Column(DateTime, nullable=True)
+    acs_user_id = Column(String(255), nullable=True)
 
     deliveries = relationship("Delivery", back_populates="driver")
 
@@ -66,6 +67,8 @@ class Hub(Base):
     today_earnings = Column(Float, default=0.0)
     capacity = Column(Integer, default=10)
     current_load = Column(Integer, default=0)
+    owner_phone = Column(String(20), nullable=True)
+    total_accepted_all_time = Column(Integer, default=0)
 
     broadcasts = relationship("HubBroadcast", back_populates="hub")
 

@@ -13,7 +13,18 @@ class HubInitial extends HubState {
 }
 
 class HubLoading extends HubState {
-  const HubLoading();
+  final HubStatsModel? stats;
+  final List<BroadcastModel> broadcasts;
+  final List<StoredPackageModel> packages;
+
+  const HubLoading({
+    this.stats,
+    this.broadcasts = const [],
+    this.packages = const [],
+  });
+
+  @override
+  List<Object?> get props => [stats, broadcasts, packages];
 }
 
 class HubBroadcastsLoaded extends HubState {

@@ -18,6 +18,7 @@ class EarningsScreen extends StatelessWidget {
         HubStatsModel? stats;
         if (state is HubStatsLoaded) stats = state.stats;
         if (state is HubBroadcastsLoaded) stats = state.hubStats;
+        if (state is HubLoading) stats = state.stats;
 
         return ListView(
           padding: const EdgeInsets.all(16),

@@ -64,11 +64,16 @@ export default function StatsBar() {
           ),
           sub: '🌿 from hub reroutes',
         },
+        {
+          label: 'Active Hubs',
+          value: <span className="text-teal text-3xl font-bold">{stats.active_hubs}</span>,
+          sub: 'registered micro-hubs',
+        },
       ]
-    : Array(4).fill(null)
+    : Array(5).fill(null)
 
   return (
-    <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 xl:grid-cols-5 gap-4">
       {cards.map((card, i) =>
         card === null ? (
           <div key={i} className="bg-surface rounded-xl border border-slate-700/30 p-5 animate-pulse h-24" />

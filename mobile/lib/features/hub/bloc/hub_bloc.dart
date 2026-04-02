@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:neardrop/features/hub/bloc/hub_event.dart';
 import 'package:neardrop/features/hub/bloc/hub_state.dart';
+import 'package:neardrop/features/hub/models/hub_model.dart';
 import 'package:neardrop/features/hub/repository/hub_repository.dart';
 
 class HubBloc extends Bloc<HubEvent, HubState> {
@@ -20,26 +21,50 @@ class HubBloc extends Bloc<HubEvent, HubState> {
     HubBroadcastsLoadRequested event,
     Emitter<HubState> emit,
   ) async {
-    final existingTrustScore = state is HubStatsLoaded
-        ? (state as HubStatsLoaded).stats.trustScore
+    final previousStats = state is HubStatsLoaded
+        ? (state as HubStatsLoaded).stats
         : state is HubBroadcastsLoaded
-            ? (state as HubBroadcastsLoaded).trustScore
-            : 0;
-
-    final existingPackages = state is HubBroadcastsLoaded
+            ? (state as HubBroadcastsLoaded).hubStats
+            : state is HubLoading
+                ? (state as HubLoading).stats
+                : null;
+    final previousBroadcasts = state is HubBroadcastsLoaded
+        ? (state as HubBroadcastsLoaded).broadcasts
+        : state is HubLoading
+            ? (state as HubLoading).broadcasts
+            : const <BroadcastModel>[];
+    final previousPackages = state is HubBroadcastsLoaded
         ? (state as HubBroadcastsLoaded).storedPackages
-        : const [];
+        : state is HubLoading
+            ? (state as HubLoading).packages
+            : const <StoredPackageModel>[];
 
-    emit(const HubLoading());
+    emit(HubLoading(
+      stats: previousStats,
+      broadcasts: previousBroadcasts,
+      packages: previousPackages,
+    ));
 
     final result = await _repository.getActiveBroadcasts(event.hubId);
     if (result.isSuccess) {
       // Also load stored packages in parallel
       final packagesResult = await _repository.getStoredPackages(event.hubId);
+      // Re-evaluate state after await to pick up concurrent stats load
+      final currentStats = state is HubStatsLoaded
+          ? (state as HubStatsLoaded).stats
+          : state is HubBroadcastsLoaded
+              ? (state as HubBroadcastsLoaded).hubStats
+              : null;
+      final currentScore = currentStats?.trustScore ?? 0;
+      final currentPackages = state is HubBroadcastsLoaded
+          ? (state as HubBroadcastsLoaded).storedPackages
+          : packagesResult.data ?? [];
+
       emit(HubBroadcastsLoaded(
         result.data ?? [],
-        trustScore: existingTrustScore,
-        storedPackages: packagesResult.data ?? [],
+        trustScore: currentScore,
+        hubStats: currentStats,
+        storedPackages: currentPackages,
       ));
     } else {
       emit(HubError(result.error ?? 'Failed to load broadcasts'));
@@ -50,7 +75,29 @@ class HubBloc extends Bloc<HubEvent, HubState> {
     HubBroadcastAccepted event,
     Emitter<HubState> emit,
   ) async {
-    emit(const HubLoading());
+    final previousStats = state is HubStatsLoaded
+        ? (state as HubStatsLoaded).stats
+        : state is HubBroadcastsLoaded
+            ? (state as HubBroadcastsLoaded).hubStats
+            : state is HubLoading
+                ? (state as HubLoading).stats
+                : null;
+    final previousBroadcasts = state is HubBroadcastsLoaded
+        ? (state as HubBroadcastsLoaded).broadcasts
+        : state is HubLoading
+            ? (state as HubLoading).broadcasts
+            : const <BroadcastModel>[];
+    final previousPackages = state is HubBroadcastsLoaded
+        ? (state as HubBroadcastsLoaded).storedPackages
+        : state is HubLoading
+            ? (state as HubLoading).packages
+            : const <StoredPackageModel>[];
+
+    emit(HubLoading(
+      stats: previousStats,
+      broadcasts: previousBroadcasts,
+      packages: previousPackages,
+    ));
     final result =
         await _repository.acceptBroadcast(event.broadcastId, event.hubId);
     if (result.isSuccess && result.data != null) {

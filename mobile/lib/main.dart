@@ -1,4 +1,5 @@
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:neardrop/core/di/service_locator.dart';
@@ -24,6 +25,8 @@ void main() async {
   setupServiceLocator();
   runApp(const NearDropApp());
 }
+
+// ── App ───────────────────────────────────────────────────────────────────────
 
 class NearDropApp extends StatelessWidget {
   const NearDropApp({super.key});
@@ -72,7 +75,6 @@ class _AppRoot extends StatelessWidget {
             ),
           );
         }
-        // AuthBloc listener will navigate; show login as safe default
         return const LoginScreen();
       },
     );

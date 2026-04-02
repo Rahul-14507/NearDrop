@@ -10,6 +10,8 @@ class DeliveryModel extends Equatable {
   final double weightKg;
   final DateTime createdAt;
   final String? pickupCode;
+  final double? lat;
+  final double? lng;
 
   const DeliveryModel({
     required this.id,
@@ -21,6 +23,8 @@ class DeliveryModel extends Equatable {
     required this.weightKg,
     required this.createdAt,
     this.pickupCode,
+    this.lat,
+    this.lng,
   });
 
   factory DeliveryModel.fromJson(Map<String, dynamic> json) => DeliveryModel(
@@ -33,10 +37,12 @@ class DeliveryModel extends Equatable {
         weightKg: (json['weight_kg'] as num).toDouble(),
         createdAt: DateTime.parse(json['created_at'] as String),
         pickupCode: json['pickup_code'] as String?,
+        lat: (json['lat'] as num?)?.toDouble(),
+        lng: (json['lng'] as num?)?.toDouble(),
       );
 
   @override
-  List<Object?> get props => [id, orderId, status, pickupCode];
+  List<Object?> get props => [id, orderId, status, pickupCode, lat, lng];
 }
 
 class NearbyHubModel extends Equatable {

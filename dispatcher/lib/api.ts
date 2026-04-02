@@ -3,11 +3,11 @@ import type {
   DeliveryBatch,
   DeliveryListItem,
   DispatcherDriver,
+  DispatcherHub,
   DispatcherStats,
+  HubDropHistoryItem,
+  RegisterHubRequest,
 } from './types'
-
-// Client-side API calls go through the Next.js proxy which attaches the token.
-// Server-side calls (in server components) use serverFetch() directly to FastAPI.
 
 const PROXY_BASE = '/api/backend'
 
@@ -58,6 +58,33 @@ export async function uploadBatch(
   return proxyFetch('/dispatcher/batch/upload', {
     method: 'POST',
     body: form,
+  })
+}
+
+export function fetchHubs(): Promise<DispatcherHub[]> {
+  return proxyFetch('/dispatcher/hubs')
+}
+
+export function fetchHubHistory(hubId: number): Promise<HubDropHistoryItem[]> {
+  return proxyFetch(`/dispatcher/hubs/${hubId}/history`)
+}
+
+export function registerHub(data: RegisterHubRequest): Promise<DispatcherHub> {
+  return proxyFetch('/dispatcher/hubs', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+}
+
+export function updateHub(
+  hubId: number,
+  data: Partial<RegisterHubRequest & { is_active: boolean }>,
+): Promise<DispatcherHub> {
+  return proxyFetch(`/dispatcher/hubs/${hubId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
   })
 }
 

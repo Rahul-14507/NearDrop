@@ -1,61 +1,38 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'package:speech_to_text/speech_to_text.dart';
+import 'package:neardrop/core/services/azure_stt_service.dart';
 import 'package:neardrop/features/driver/bloc/voice_event.dart';
 import 'package:neardrop/features/driver/bloc/voice_state.dart';
 
 class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
-  final SpeechToText _stt = SpeechToText();
-  bool _available = false;
+  final AzureSttService _sttService = AzureSttService();
 
   VoiceBloc() : super(const VoiceIdle()) {
     on<VoiceStartListening>(_onStart);
     on<VoiceStopListening>(_onStop);
     on<VoiceTranscriptReceived>(_onTranscript);
     on<VoiceReset>(_onReset);
-    _init();
-  }
-
-  Future<void> _init() async {
-    final status = await Permission.microphone.request();
-    if (status.isGranted) {
-      _available = await _stt.initialize(
-        onStatus: (s) {
-          if (s == 'done' || s == 'notListening') {
-            if (!isClosed) add(const VoiceStopListening());
-          }
-        },
-      );
-    }
   }
 
   Future<void> _onStart(
     VoiceStartListening event,
     Emitter<VoiceState> emit,
   ) async {
-    if (!_available) {
-      emit(const VoiceError('Microphone not available'));
-      return;
-    }
     emit(const VoiceListening());
-    await _stt.listen(
-      onResult: (result) {
-        if (result.finalResult && !isClosed) {
-          add(VoiceTranscriptReceived(result.recognizedWords));
-        }
-      },
-      listenFor: const Duration(seconds: 10),
-      pauseFor: const Duration(seconds: 3),
-      localeId: 'en_IN',
-      cancelOnError: true,
-    );
+    final text = await _sttService.startListening();
+    if (!isClosed) {
+      if (text != null && text.isNotEmpty) {
+        add(VoiceTranscriptReceived(text));
+      } else {
+        emit(const VoiceIdle());
+      }
+    }
   }
 
   Future<void> _onStop(
     VoiceStopListening event,
     Emitter<VoiceState> emit,
   ) async {
-    if (_stt.isListening) await _stt.stop();
+    await _sttService.stopListening();
     emit(const VoiceIdle());
   }
 
@@ -107,7 +84,7 @@ class VoiceBloc extends Bloc<VoiceEvent, VoiceState> {
 
   @override
   Future<void> close() {
-    _stt.cancel();
+    _sttService.dispose();
     return super.close();
   }
 }

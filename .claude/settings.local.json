@@ -26,7 +26,11 @@
       "Bash(xargs grep:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(powershell -Command \"netstat -an | Select-String ''''8000''''\")",
+      "Bash(powershell -Command \"New-NetFirewallRule -DisplayName ''NearDrop Backend'' -Direction Inbound -Protocol TCP -LocalPort 8000 -Action Allow\")",
+      "Bash(python -c \":*)",
+      "Bash(find /c/Projects/NearDrop -type d -not -path */venv/* -not -path */node_modules/* -not -path */__pycache__/* -not -path */.git/*)"
     ]
   }
 }

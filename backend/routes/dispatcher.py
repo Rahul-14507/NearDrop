@@ -14,15 +14,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
-from auth import get_current_dispatcher
+from auth import get_current_dispatcher, get_current_user
 from database import get_db
 from models import (
     Delivery, DeliveryBatch, DeliveryStatus, Dispatcher, Driver,
-    HubBroadcast, PackageSize,
+    Hub, HubBroadcast, HubType, PackageSize, User,
 )
 from schemas import (
-    BatchUploadResponse, DispatcherBatchOut, DispatcherDeliveryListOut,
-    DispatcherDeliveryOut, DispatcherDriverOut, DispatcherStatsOut,
+    BatchAcceptResponse, BatchRejectRequest, BatchUploadResponse,
+    DispatcherBatchOut, DispatcherDeliveryListOut,
+    DispatcherDeliveryOut, DispatcherDriverOut, DispatcherHubOut,
+    DispatcherStatsOut, HubDropHistoryItem, RegisterHubRequest,
+    UpdateHubRequest,
 )
 from services.azure_maps import geocode_address
 from services.queue_engine import order_delivery_queue
@@ -41,7 +44,7 @@ async def list_drivers(
     db: AsyncSession = Depends(get_db),
     _: Dispatcher = Depends(get_current_dispatcher),
 ):
-    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    window_start = datetime.utcnow() - timedelta(days=7)
     active_threshold = datetime.utcnow() - timedelta(minutes=5)
 
     result = await db.execute(select(Driver))
@@ -57,7 +60,7 @@ async def list_drivers(
         assigned_result = await db.execute(
             select(func.count(Delivery.id)).where(
                 Delivery.driver_id == driver.id,
-                Delivery.created_at >= today_start,
+                Delivery.created_at >= window_start,
             )
         )
         today_assigned = assigned_result.scalar() or 0
@@ -65,7 +68,7 @@ async def list_drivers(
         completed_result = await db.execute(
             select(func.count(Delivery.id)).where(
                 Delivery.driver_id == driver.id,
-                Delivery.created_at >= today_start,
+                Delivery.created_at >= window_start,
                 Delivery.status == DeliveryStatus.delivered,
             )
         )
@@ -74,7 +77,7 @@ async def list_drivers(
         failed_result = await db.execute(
             select(func.count(Delivery.id)).where(
                 Delivery.driver_id == driver.id,
-                Delivery.created_at >= today_start,
+                Delivery.created_at >= window_start,
                 Delivery.status == DeliveryStatus.failed,
             )
         )
@@ -201,7 +204,7 @@ async def upload_batch(
 
     first_delivery = refreshed_deliveries[0] if refreshed_deliveries else None
 
-    # Push WebSocket event to driver
+    # Push WebSocket event to driver (includes full deliveries list)
     first_delivery_payload = None
     if first_delivery:
         first_delivery_payload = {
@@ -215,11 +218,29 @@ async def upload_batch(
             "queue_position": first_delivery.queue_position,
         }
 
+    all_deliveries_payload = [
+        {
+            "id": d.id,
+            "order_id": d.order_id,
+            "address": d.address,
+            "status": d.status.value,
+            "recipient_name": d.recipient_name,
+            "package_size": d.package_size.value if hasattr(d.package_size, "value") else str(d.package_size),
+            "weight_kg": d.weight_kg,
+            "queue_position": d.queue_position,
+            "lat": d.lat,
+            "lng": d.lng,
+            "customer_phone": d.customer_phone,
+        }
+        for d in refreshed_deliveries
+    ]
+
     await manager.broadcast("batch_assigned", {
         "driver_id": driver_id,
         "batch_code": batch_code,
         "total_deliveries": len(rows),
         "first_delivery": first_delivery_payload,
+        "deliveries": all_deliveries_payload,
     })
 
     # FCM push to driver
@@ -290,12 +311,12 @@ async def list_batches(
     db: AsyncSession = Depends(get_db),
     _: Dispatcher = Depends(get_current_dispatcher),
 ):
-    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    window_start = datetime.utcnow() - timedelta(days=7)
 
     batches_result = await db.execute(
         select(DeliveryBatch)
         .options(selectinload(DeliveryBatch.driver))
-        .where(DeliveryBatch.assigned_at >= today_start)
+        .where(DeliveryBatch.assigned_at >= window_start)
         .order_by(DeliveryBatch.assigned_at.desc())
     )
     batches = batches_result.scalars().all()
@@ -327,6 +348,82 @@ async def list_batches(
     return output
 
 
+# ─── Batch Accept / Reject (driver-facing) ────────────────────────────────────
+
+@router.post("/batch/{batch_code}/accept", response_model=BatchAcceptResponse)
+async def accept_batch(
+    batch_code: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Driver accepts a batch — marks batch active and first delivery en_route."""
+    batch_result = await db.execute(
+        select(DeliveryBatch)
+        .options(selectinload(DeliveryBatch.driver))
+        .where(DeliveryBatch.batch_code == batch_code)
+    )
+    batch = batch_result.scalar_one_or_none()
+    if not batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+
+    batch.status = "accepted"
+    db.add(batch)
+
+    # Reload ordered deliveries
+    deliveries_result = await db.execute(
+        select(Delivery)
+        .where(Delivery.batch_id == batch.id)
+        .order_by(Delivery.queue_position)
+    )
+    deliveries = deliveries_result.scalars().all()
+
+    # Mark first delivery as en_route (it likely already is, but be explicit)
+    if deliveries:
+        first = deliveries[0]
+        first.status = DeliveryStatus.en_route
+        db.add(first)
+
+    await db.commit()
+
+    return BatchAcceptResponse(
+        batch_code=batch_code,
+        status="accepted",
+        deliveries=[DispatcherDeliveryOut.model_validate(d) for d in deliveries],
+    )
+
+
+@router.post("/batch/{batch_code}/reject")
+async def reject_batch(
+    batch_code: str,
+    body: BatchRejectRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Driver rejects a batch — marks batch rejected and broadcasts WS event."""
+    batch_result = await db.execute(
+        select(DeliveryBatch)
+        .options(selectinload(DeliveryBatch.driver))
+        .where(DeliveryBatch.batch_code == batch_code)
+    )
+    batch = batch_result.scalar_one_or_none()
+    if not batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+
+    batch.status = "rejected"
+    db.add(batch)
+    await db.commit()
+
+    driver_name = batch.driver.name if batch.driver else "Unknown"
+
+    await manager.broadcast("batch_rejected", {
+        "batch_code": batch_code,
+        "driver_name": driver_name,
+        "reason": body.reason,
+    })
+
+    return {"batch_code": batch_code, "status": "rejected"}
+
+
 # ─── Stats ────────────────────────────────────────────────────────────────────
 
 @router.get("/stats", response_model=DispatcherStatsOut)
@@ -334,7 +431,7 @@ async def get_dispatcher_stats(
     db: AsyncSession = Depends(get_db),
     _: Dispatcher = Depends(get_current_dispatcher),
 ):
-    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    window_start = datetime.utcnow() - timedelta(days=7)
     active_threshold = datetime.utcnow() - timedelta(minutes=5)
 
     drivers_result = await db.execute(select(Driver))
@@ -345,13 +442,13 @@ async def get_dispatcher_stats(
     )
 
     total_result = await db.execute(
-        select(func.count(Delivery.id)).where(Delivery.created_at >= today_start)
+        select(func.count(Delivery.id)).where(Delivery.created_at >= window_start)
     )
     total_assigned = total_result.scalar() or 0
 
     delivered_result = await db.execute(
         select(func.count(Delivery.id)).where(
-            Delivery.created_at >= today_start,
+            Delivery.created_at >= window_start,
             Delivery.status == DeliveryStatus.delivered,
         )
     )
@@ -359,7 +456,7 @@ async def get_dispatcher_stats(
 
     failed_result = await db.execute(
         select(func.count(Delivery.id)).where(
-            Delivery.created_at >= today_start,
+            Delivery.created_at >= window_start,
             Delivery.status == DeliveryStatus.failed,
         )
     )
@@ -367,7 +464,7 @@ async def get_dispatcher_stats(
 
     hub_rerouted_result = await db.execute(
         select(func.count(HubBroadcast.id)).where(
-            HubBroadcast.broadcast_at >= today_start,
+            HubBroadcast.broadcast_at >= window_start,
             HubBroadcast.accepted_at != None,
         )
     )
@@ -375,11 +472,16 @@ async def get_dispatcher_stats(
 
     pending_result = await db.execute(
         select(func.count(Delivery.id)).where(
-            Delivery.created_at >= today_start,
+            Delivery.created_at >= window_start,
             Delivery.status.in_([DeliveryStatus.en_route, DeliveryStatus.arrived]),
         )
     )
     pending_today = pending_result.scalar() or 0
+
+    active_hubs_result = await db.execute(
+        select(func.count(Hub.id)).where(Hub.availability == True)
+    )
+    active_hubs = active_hubs_result.scalar() or 0
 
     success_rate = round(delivered_today / total_assigned * 100, 1) if total_assigned > 0 else 0.0
     co2_saved = round(hub_rerouted * 0.8, 2)
@@ -393,6 +495,7 @@ async def get_dispatcher_stats(
         pending_today=pending_today,
         success_rate_percent=success_rate,
         co2_saved_kg=co2_saved,
+        active_hubs=active_hubs,
     )
 
 
@@ -403,7 +506,7 @@ async def list_all_deliveries(
     db: AsyncSession = Depends(get_db),
     _: Dispatcher = Depends(get_current_dispatcher),
 ):
-    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    window_start = datetime.utcnow() - timedelta(days=7)
 
     deliveries_result = await db.execute(
         select(Delivery)
@@ -411,7 +514,7 @@ async def list_all_deliveries(
             selectinload(Delivery.driver),
             selectinload(Delivery.batch),
         )
-        .where(Delivery.created_at >= today_start)
+        .where(Delivery.created_at >= window_start)
         .order_by(Delivery.created_at.desc())
     )
     deliveries = deliveries_result.scalars().all()
@@ -433,5 +536,213 @@ async def list_all_deliveries(
             hub_otp_verified=d.hub_otp_verified,
             hub_otp_sent_at=d.hub_otp_sent_at,
             created_at=d.created_at,
+        ))
+    return output
+
+
+# ─── Hub Management ───────────────────────────────────────────────────────────
+
+@router.get("/hubs", response_model=list[DispatcherHubOut])
+async def list_hubs(
+    db: AsyncSession = Depends(get_db),
+    _: Dispatcher = Depends(get_current_dispatcher),
+):
+    """Return all hubs with operational stats for the dispatcher view."""
+    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+
+    hubs_result = await db.execute(select(Hub))
+    hubs = hubs_result.scalars().all()
+
+    output = []
+    for hub in hubs:
+        # Today's accepted drops
+        today_drops_result = await db.execute(
+            select(func.count(HubBroadcast.id)).where(
+                HubBroadcast.hub_id == hub.id,
+                HubBroadcast.accepted_at != None,
+                HubBroadcast.accepted_at >= today_start,
+            )
+        )
+        today_drops = today_drops_result.scalar() or 0
+
+        # Current packages still held at hub (status = hub_delivered)
+        packages_held_result = await db.execute(
+            select(func.count(Delivery.id)).where(
+                Delivery.hub_id == hub.id,
+                Delivery.status == DeliveryStatus.hub_delivered,
+            )
+        )
+        current_packages_held = packages_held_result.scalar() or 0
+
+        output.append(DispatcherHubOut(
+            id=hub.id,
+            name=hub.name,
+            lat=hub.lat,
+            lng=hub.lng,
+            hub_type=hub.hub_type.value if hasattr(hub.hub_type, "value") else str(hub.hub_type),
+            is_active=hub.availability,
+            trust_score=hub.trust_score,
+            total_drops_all_time=hub.total_accepted_all_time or 0,
+            today_drops=today_drops,
+            today_earnings_inr=hub.today_earnings or 0.0,
+            current_packages_held=current_packages_held,
+            owner_phone=hub.owner_phone,
+        ))
+    return output
+
+
+@router.post("/hubs", response_model=DispatcherHubOut, status_code=201)
+async def register_hub(
+    req: RegisterHubRequest,
+    db: AsyncSession = Depends(get_db),
+    _: Dispatcher = Depends(get_current_dispatcher),
+):
+    """Register a new micro-hub. Geocodes address if lat/lng not provided."""
+    lat = req.lat
+    lng = req.lng
+
+    if lat is None or lng is None:
+        geo = await geocode_address(req.address)
+        if geo:
+            lat = geo["lat"]
+            lng = geo["lng"]
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail="lat/lng not provided and geocoding failed for the given address",
+            )
+
+    # Validate hub_type
+    try:
+        hub_type_enum = HubType(req.hub_type)
+    except ValueError:
+        hub_type_enum = HubType.kirana
+
+    hub = Hub(
+        name=req.name,
+        lat=lat,
+        lng=lng,
+        hub_type=hub_type_enum,
+        availability=True,
+        owner_phone=req.owner_phone,
+        trust_score=85,
+        today_earnings=0.0,
+        capacity=10,
+        current_load=0,
+        total_accepted_all_time=0,
+    )
+    db.add(hub)
+    await db.commit()
+    await db.refresh(hub)
+
+    return DispatcherHubOut(
+        id=hub.id,
+        name=hub.name,
+        lat=hub.lat,
+        lng=hub.lng,
+        hub_type=hub.hub_type.value if hasattr(hub.hub_type, "value") else str(hub.hub_type),
+        is_active=hub.availability,
+        trust_score=hub.trust_score,
+        total_drops_all_time=0,
+        today_drops=0,
+        today_earnings_inr=0.0,
+        current_packages_held=0,
+        owner_phone=hub.owner_phone,
+    )
+
+
+@router.patch("/hubs/{hub_id}", response_model=DispatcherHubOut)
+async def update_hub(
+    hub_id: int,
+    req: UpdateHubRequest,
+    db: AsyncSession = Depends(get_db),
+    _: Dispatcher = Depends(get_current_dispatcher),
+):
+    """Update hub availability, name, or type."""
+    hub_result = await db.execute(select(Hub).where(Hub.id == hub_id))
+    hub = hub_result.scalar_one_or_none()
+    if not hub:
+        raise HTTPException(status_code=404, detail="Hub not found")
+
+    if req.is_active is not None:
+        hub.availability = req.is_active
+    if req.name is not None:
+        hub.name = req.name
+    if req.hub_type is not None:
+        try:
+            hub.hub_type = HubType(req.hub_type)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid hub_type: {req.hub_type}")
+
+    db.add(hub)
+    await db.commit()
+    await db.refresh(hub)
+
+    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    today_drops_result = await db.execute(
+        select(func.count(HubBroadcast.id)).where(
+            HubBroadcast.hub_id == hub.id,
+            HubBroadcast.accepted_at != None,
+            HubBroadcast.accepted_at >= today_start,
+        )
+    )
+    today_drops = today_drops_result.scalar() or 0
+
+    packages_held_result = await db.execute(
+        select(func.count(Delivery.id)).where(
+            Delivery.hub_id == hub.id,
+            Delivery.status == DeliveryStatus.hub_delivered,
+        )
+    )
+    current_packages_held = packages_held_result.scalar() or 0
+
+    return DispatcherHubOut(
+        id=hub.id,
+        name=hub.name,
+        lat=hub.lat,
+        lng=hub.lng,
+        hub_type=hub.hub_type.value if hasattr(hub.hub_type, "value") else str(hub.hub_type),
+        is_active=hub.availability,
+        trust_score=hub.trust_score,
+        total_drops_all_time=hub.total_accepted_all_time or 0,
+        today_drops=today_drops,
+        today_earnings_inr=hub.today_earnings or 0.0,
+        current_packages_held=current_packages_held,
+        owner_phone=hub.owner_phone,
+    )
+
+
+@router.get("/hubs/{hub_id}/history", response_model=list[HubDropHistoryItem])
+async def get_hub_history(
+    hub_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: Dispatcher = Depends(get_current_dispatcher),
+):
+    """Return the last 50 broadcast events for a specific hub."""
+    hub_result = await db.execute(select(Hub).where(Hub.id == hub_id))
+    hub = hub_result.scalar_one_or_none()
+    if not hub:
+        raise HTTPException(status_code=404, detail="Hub not found")
+
+    broadcasts_result = await db.execute(
+        select(HubBroadcast)
+        .options(selectinload(HubBroadcast.delivery))
+        .where(HubBroadcast.hub_id == hub_id)
+        .order_by(HubBroadcast.broadcast_at.desc())
+        .limit(50)
+    )
+    broadcasts = broadcasts_result.scalars().all()
+
+    output = []
+    for bc in broadcasts:
+        delivery = bc.delivery
+        if delivery is None:
+            continue
+        output.append(HubDropHistoryItem(
+            delivery_id=delivery.id,
+            order_id=delivery.order_id or "",
+            address=delivery.address,
+            accepted_at=bc.accepted_at,
+            pickup_code=bc.pickup_code,
         ))
     return output

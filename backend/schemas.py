@@ -233,6 +233,7 @@ class DispatcherStatsOut(BaseModel):
     pending_today: int
     success_rate_percent: float
     co2_saved_kg: float
+    active_hubs: int
 
 
 class DispatcherDeliveryOut(BaseModel):
@@ -291,3 +292,56 @@ class DispatcherDeliveryListOut(BaseModel):
     hub_otp_verified: Optional[bool] = None
     hub_otp_sent_at: Optional[datetime] = None
     created_at: datetime
+
+
+# --- Dispatcher Hub Management ---
+
+class DispatcherHubOut(BaseModel):
+    id: int
+    name: str
+    lat: float
+    lng: float
+    hub_type: str
+    is_active: bool
+    trust_score: int
+    total_drops_all_time: int
+    today_drops: int
+    today_earnings_inr: float
+    current_packages_held: int
+    owner_phone: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class RegisterHubRequest(BaseModel):
+    name: str
+    address: str
+    lat: Optional[float] = None
+    lng: Optional[float] = None
+    hub_type: str
+    owner_phone: Optional[str] = None
+
+
+class UpdateHubRequest(BaseModel):
+    is_active: Optional[bool] = None
+    name: Optional[str] = None
+    hub_type: Optional[str] = None
+
+
+class HubDropHistoryItem(BaseModel):
+    delivery_id: int
+    order_id: str
+    address: str
+    accepted_at: Optional[datetime] = None
+    pickup_code: Optional[str] = None
+
+
+class BatchAcceptResponse(BaseModel):
+    batch_code: str
+    status: str
+    deliveries: List[DispatcherDeliveryOut]
+
+
+class BatchRejectRequest(BaseModel):
+    reason: str

@@ -61,16 +61,25 @@ class ActivePackagesScreen extends StatelessWidget {
         }
       },
       builder: (context, state) {
-        if (state is HubLoading) {
+        final broadcasts = state is HubBroadcastsLoaded
+            ? state.broadcasts
+            : state is HubLoading
+                ? state.broadcasts
+                : const <BroadcastModel>[];
+        final stored = state is HubBroadcastsLoaded
+            ? state.storedPackages
+            : state is HubLoading
+                ? state.packages
+                : const <StoredPackageModel>[];
+
+        if (state is HubLoading && broadcasts.isEmpty && stored.isEmpty) {
           return const Center(
             child: CircularProgressIndicator(color: AppColors.accent),
           );
         }
 
-        if (state is HubBroadcastsLoaded) {
-          final broadcasts = state.broadcasts;
-          final stored = state.storedPackages;
-
+        if (state is HubBroadcastsLoaded ||
+            (state is HubLoading && (broadcasts.isNotEmpty || stored.isNotEmpty))) {
           if (broadcasts.isEmpty && stored.isEmpty) {
             return _emptyView(context);
           }
