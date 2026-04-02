@@ -123,7 +123,7 @@ async def logging_middleware(request: Request, call_next):
 # (including 401s from jwt_middleware).
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origin_regex="http://localhost:.*|http://127.0.0.1:.*|http://192.168.1.7:.*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

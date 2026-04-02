@@ -1,6 +1,68 @@
-# NearDrop — Intelligent Last-Mile Delivery Recovery
+<div align="center">
 
-NearDrop intercepts failed deliveries in real time and broadcasts them to a geo-proximate network of community micro-hubs (kirana stores, pharmacies, apartment receptions). When a driver marks a delivery as failed, the DeadMile Engine finds available hubs within 2 km, broadcasts the package offer over WebSocket, and reroutes the driver to the first accepting hub — eliminating retry trips and building a verifiable trust record for every actor in the chain.
+# 🚀 NearDrop
+### Intelligent Last-Mile Delivery Recovery Platform
+
+*When a delivery fails, NearDrop doesn't give up — it reroutes.*
+
+[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.111+-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![Flutter](https://img.shields.io/badge/Flutter-3.19+-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
+[![Next.js](https://img.shields.io/badge/Next.js-14+-000000?logo=next.js&logoColor=white)](https://nextjs.org)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+</div>
+
+---
+
+## What is NearDrop?
+
+NearDrop intercepts failed deliveries in real time and broadcasts them to a geo-proximate network of community micro-hubs — kirana stores, pharmacies, apartment lobbies. When a driver marks a delivery as failed, the **DeadMile Engine** finds available hubs within 2 km, broadcasts the package offer over WebSocket, and reroutes the driver to the first accepting hub — eliminating wasted retry trips and building a verifiable trust record for every actor in the chain.
+
+---
+
+## System Architecture
+
+```mermaid
+graph TD
+    subgraph "Clients"
+        A[📱 Flutter Mobile App<br/>Driver & Hub Owner]
+        I[🖥️ Next.js Dispatcher Portal]
+    end
+
+    subgraph "Backend - FastAPI"
+        B[REST API + JWT Auth]
+        H[WebSocket Manager<br/>Real-time Broadcasts]
+        Q[DeadMile Engine<br/>Hub Finder + Queue Optimizer]
+    end
+
+    subgraph "Data"
+        C[(SQLite / PostgreSQL)]
+    end
+
+    subgraph "Azure Cloud Services"
+        D[Azure Speech Services<br/>STT + TTS]
+        E[Azure Maps<br/>Geocoding + Navigation]
+        F[Azure Communication Services<br/>SMS OTP]
+    end
+
+    subgraph "Third-Party Services"
+        G[Firebase FCM<br/>Push Notifications]
+        J[Gmail SMTP<br/>Customer OTP Emails]
+    end
+
+    A -->|REST + JWT| B
+    A -->|WebSocket| H
+    I -->|REST + JWT cookie| B
+    B --> C
+    B --> Q
+    B --> D
+    B --> E
+    B --> F
+    B --> G
+    B --> J
+    H --> A
+```
 
 ---
 
@@ -8,39 +70,39 @@ NearDrop intercepts failed deliveries in real time and broadcasts them to a geo-
 
 ```
 NearDrop/
-├── backend/                        # FastAPI backend
-│   ├── routes/                     # Auth, delivery, hubs, driver, dashboard, dispatcher, voice
-│   ├── services/                   # Azure Maps, Azure SMS, Firebase FCM, queue engine, email
+├── backend/                        # FastAPI backend (Python)
+│   ├── routes/                     # auth, delivery, hubs, driver, dashboard, dispatcher, voice, navigation
+│   ├── services/                   # Azure Maps, Azure Speech, SMS, Firebase FCM, email, queue engine
 │   ├── models.py                   # SQLAlchemy ORM models
 │   ├── schemas.py                  # Pydantic v2 request/response schemas
-│   ├── database.py                 # Async SQLAlchemy engine + session
-│   ├── auth.py                     # JWT creation/validation, bcrypt hashing
+│   ├── database.py                 # Async SQLAlchemy engine + session factory
+│   ├── auth.py                     # JWT creation/validation, bcrypt password hashing
 │   ├── websocket_manager.py        # In-memory WebSocket connection registry
-│   ├── main.py                     # FastAPI app factory, middleware, routers
-│   ├── seed.py                     # Hyderabad mock data (5 drivers, 8 hubs, 50 deliveries, 1 dispatcher, 2 batches)
+│   ├── main.py                     # FastAPI app factory, CORS, JWT middleware, routers
+│   ├── seed.py                     # Hyderabad mock data — 5 drivers, 8 hubs, 50 deliveries
 │   ├── requirements.txt
-│   ├── Dockerfile
-│   └── startup.sh
-├── dispatcher/                     # Next.js 14 dispatcher web portal
+│   └── Dockerfile
+│
+├── dispatcher/                     # Next.js 14 web portal for dispatchers
 │   ├── app/
-│   │   ├── api/                    # auth/login, auth/logout, backend proxy
-│   │   └── dashboard/              # Dashboard, drivers, deliveries pages
+│   │   ├── api/                    # auth/login, auth/logout, backend proxy routes
+│   │   └── dashboard/              # Dashboard, Drivers, Deliveries, Hubs pages
 │   ├── components/                 # StatsBar, DriverCard, CSVUploadModal, DeliveryTable, Sidebar
-│   ├── lib/                        # api.ts (typed helpers), types.ts
-│   ├── middleware.ts                # JWT route protection
-│   ├── package.json
-│   └── tailwind.config.ts
-├── mobile/                         # Flutter mobile app (BLoC + feature-first)
+│   ├── lib/                        # api.ts (typed API helpers), types.ts
+│   └── middleware.ts               # JWT-based route protection
+│
+├── mobile/                         # Flutter mobile app (BLoC + Feature-first architecture)
 │   ├── lib/
-│   │   ├── core/                   # Config, theme, network, DI, storage
-│   │   ├── features/               # auth/, driver/, hub/
-│   │   └── shared/                 # Widgets, models
+│   │   ├── core/                   # AppConfig, theme, network, DI (GetIt), secure storage
+│   │   ├── features/
+│   │   │   ├── auth/               # Login, JWT persistence
+│   │   │   ├── driver/             # Active delivery map, navigation, voice, trust score
+│   │   │   └── hub/                # Broadcasts, OTP verification, earnings, stored packages
+│   │   └── shared/                 # Reusable widgets, API response models
 │   ├── android/
-│   ├── assets/
-│   ├── pubspec.yaml
-│   └── pubspec.lock
-├── .env.example                    # All environment variables with comments
-├── .gitignore
+│   └── pubspec.yaml
+│
+├── .env                            # All environment variables (see configuration guide below)
 ├── docker-compose.yml              # Backend + PostgreSQL for local Docker dev
 └── README.md
 ```
@@ -49,140 +111,81 @@ NearDrop/
 
 ## Prerequisites
 
-| Tool | Version |
-|---|---|
-| Python | 3.11+ |
-| Flutter | 3.19.0+ |
-| Dart SDK | 3.3.0+ |
-| Docker + Docker Compose | Latest stable |
-| Android SDK | API 21+ (for mobile) |
+| Tool | Minimum Version | Notes |
+|---|---|---|
+| Python | 3.11+ | Backend runtime |
+| Flutter | 3.19.0+ | Mobile app |
+| Dart SDK | 3.3.0+ | Included with Flutter |
+| Node.js | 18+ | Dispatcher portal |
+| Docker + Docker Compose | Latest stable | Optional; required for the Docker dev path |
+| Android SDK | API 35 | For physical device testing |
 
 ---
 
-## Quick Start — Local Development
+## Quick Start
 
-### 1. Clone and configure environment
+### Step 1 — Clone & Configure Environment
 
 ```bash
 git clone https://github.com/your-org/neardrop.git
 cd NearDrop
-cp .env.example .env
+cp .env .env.local   # Keep the original as a template reference
 ```
 
-Open `.env` and fill in at minimum:
+At minimum, set a JWT secret key in your `.env`:
+```bash
+# Auto-generate a secure key:
+python -c "import secrets; print(secrets.token_hex(32))"
+# Paste the output as the value for JWT_SECRET_KEY in .env
 ```
-JWT_SECRET_KEY=<generate with: python -c "import secrets; print(secrets.token_hex(32))">
-```
-All other values are optional for local dev — Azure and Firebase services degrade gracefully if keys are missing.
+
+> All Azure, Firebase, and SMTP variables are **optional for local development** — every service has a graceful fallback if the key is missing.
 
 ---
 
-### 2. Backend setup
+### Step 2 — Start the Backend
 
-#### Option A: Docker (recommended — includes PostgreSQL)
+Choose **one** of the following options:
+
+#### Option A: Docker (Recommended — includes PostgreSQL)
 
 ```bash
 docker compose up --build
 ```
 
-The API will be available at `http://localhost:8000`.
-API docs (Swagger UI) at `http://localhost:8000/docs`.
+The API will be live at `http://localhost:8000`.  
+Swagger UI (interactive docs): `http://localhost:8000/docs`
 
-To seed mock data into the running container:
+To seed the database with Hyderabad mock data:
 ```bash
 docker compose exec backend python seed.py
 ```
 
-#### Option B: Manual (SQLite, no Docker required)
+#### Option B: Manual with SQLite (No Docker required)
 
 ```bash
 cd backend
+
+# Create and activate a virtual environment
 python -m venv venv
-source venv/bin/activate          # Windows: venv\Scripts\activate
+venv\Scripts\activate        # Windows
+# source venv/bin/activate   # macOS / Linux
+
+# Install dependencies
 pip install -r requirements.txt
 
-# Copy and configure environment
-cp ../.env.example ../.env
-
-# Seed Hyderabad mock data
+# Seed mock data
 python seed.py
 
-# Start dev server
-uvicorn main:app --reload --port 8000
+# Start the dev server
+uvicorn main:app --reload --port 8000 --host 0.0.0.0
 ```
 
-API available at `http://localhost:8000`. Swagger UI at `http://localhost:8000/docs`.
+The API will be live at `http://localhost:8000`.
 
 ---
 
-### 3. Azure credentials — where to get them
-
-All Azure keys go in your root `.env` file. Every service degrades gracefully if the key is missing, so you only need to configure what you actually use.
-
-| Variable | Service | Where to find it |
-|---|---|---|
-| `AZURE_SPEECH_KEY` | Azure Cognitive Services — Speech | portal.azure.com → your Speech resource → **Keys and Endpoint** |
-| `AZURE_SPEECH_REGION` | Azure Cognitive Services — Speech | Same page, e.g. `eastus` or `centralindia` |
-| `AZURE_MAPS_SUBSCRIPTION_KEY` | Azure Maps | portal.azure.com → your Maps account → **Authentication** tab |
-| `AZURE_COMMUNICATION_CONNECTION_STRING` | Azure Communication Services (SMS) | portal.azure.com → your ACS resource → **Keys** |
-| `AZURE_COMMUNICATION_SENDER_PHONE` | Azure Communication Services (SMS) | portal.azure.com → your ACS resource → **Phone numbers** |
-
----
-
-### 3b. SMTP setup (customer OTP emails)
-
-OTP emails are sent when a hub accepts a package. Configure these in `.env`:
-
-```
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=your-gmail@gmail.com
-SMTP_PASSWORD=your-app-password        # Gmail: use an App Password, not your account password
-SMTP_SENDER_NAME=NearDrop
-```
-
-If these variables are absent the hub-accept endpoint still succeeds — OTP generation is skipped silently.
-
----
-
-### 4. Firebase setup (push notifications)
-
-Push notifications are optional. The app works without Firebase — FCM calls are fire-and-forget.
-
-1. Go to [console.firebase.google.com](https://console.firebase.google.com) and create a project.
-2. Add an **Android app** with package name `com.neardrop.app`.
-3. Download `google-services.json` and place it at `mobile/android/app/google-services.json`.
-4. In Project Settings → **Service Accounts** → click **Generate new private key**.
-5. Open the downloaded JSON file, copy the entire contents, and paste it as a single-line string into `.env`:
-   ```
-   FIREBASE_SERVICE_ACCOUNT_JSON={"type":"service_account","project_id":"..."}
-   ```
-
----
-
-### 5. Flutter mobile app setup
-
-```bash
-cd mobile
-flutter pub get
-```
-
-**Configure the backend URL** in `mobile/lib/core/config/app_config.dart`:
-
-| Scenario | Value for `baseUrl` |
-|---|---|
-| Android emulator (default) | `http://10.0.2.2:8000` |
-| Physical device on same WiFi | `http://192.168.X.X:8000` (your machine's LAN IP) |
-| Production | `https://neardrop-api.azurewebsites.net` |
-
-Run on a connected device or emulator:
-```bash
-flutter run
-```
-
----
-
-### 6. Dispatcher portal setup
+### Step 3 — Start the Dispatcher Portal
 
 ```bash
 cd dispatcher
@@ -191,33 +194,125 @@ npm run dev
 # Runs at http://localhost:3000
 ```
 
-The dispatcher portal proxies all API calls to the FastAPI backend. Make sure the backend is running on port 8000 before opening the portal.
+> The portal proxies all API calls to the FastAPI backend. Ensure the backend is running on port 8000 first.
 
 ---
 
-### 7. Test credentials (seeded)
+### Step 4 — Set Up the Flutter Mobile App
 
-Run `python seed.py` (or `docker compose exec backend python seed.py`) to populate the database, then log in with:
-
-| Role | Credential | Password |
-|---|---|---|
-| Driver | Phone: 9000000001 | driver123 |
-| Driver | Phone: 9000000002 | driver123 |
-| Driver | Phone: 9000000003 | driver123 |
-| Hub Owner | Phone: 9000000004 | hub123 |
-| Hub Owner | Phone: 9000000005 | hub123 |
-| Hub Owner | Phone: 9000000006 | hub123 |
-| Dispatcher | Email: dispatcher@neardrop.in | dispatch123 |
-
-Hub owner `9000000004` (Sri Ram Kirana Store) has a pre-accepted broadcast with pickup code **847291**.
-
----
-
-### Dispatcher portal — batch CSV format
-
-Upload a CSV file on the Dispatcher dashboard to assign a delivery batch to a driver. Required columns:
-
+```bash
+cd mobile
+flutter pub get
 ```
+
+The app automatically selects the correct backend URL based on the platform:
+
+| Platform | URL Used | Where to change |
+|---|---|---|
+| **Web / Chrome** | `http://localhost:8000` | `lib/core/config/app_config.dart` |
+| **Android (Physical Device)** | `http://192.168.1.7:8000` | `lib/core/config/app_config.dart` |
+| **Production** | `https://neardrop-api.azurewebsites.net` | `lib/core/config/app_config.dart` |
+
+> ⚠️ **Physical Android Device:** Update `192.168.1.7` to your machine's actual LAN IP address.  
+> Find it with: `ipconfig` on Windows → look for the **IPv4 Address** under your active Wi-Fi adapter.
+
+**Run on a connected device or browser:**
+```bash
+# Android (physical device)
+flutter run -d <device-id>                     # use 'flutter devices' to find device ID
+
+# Chrome (web)
+flutter run -d chrome
+
+# See all connected devices
+flutter devices
+```
+
+---
+
+## Test Credentials (Seeded Data)
+
+Run `python seed.py` (backend) to populate the database, then log in with:
+
+| Role | Login | Password |
+|---|---|---|
+| 🚗 Driver | Phone: `9000000001` | `driver123` |
+| 🚗 Driver | Phone: `9000000002` | `driver123` |
+| 🚗 Driver | Phone: `9000000003` | `driver123` |
+| 🏪 Hub Owner | Phone: `9000000004` | `hub123` |
+| 🏪 Hub Owner | Phone: `9000000005` | `hub123` |
+| 🏪 Hub Owner | Phone: `9000000006` | `hub123` |
+| 📋 Dispatcher | Email: `dispatcher@neardrop.in` | `dispatch123` |
+
+> **Quick test:** Hub owner `9000000004` (Sri Ram Kirana Store) has a pre-accepted broadcast with pickup code **847291**.
+
+---
+
+## Configuration Guide
+
+All configuration is managed via the `.env` file at the project root.
+
+### Core Variables (Required for basic operation)
+
+| Variable | Description | Example |
+|---|---|---|
+| `DATABASE_URL` | Database connection string | `sqlite+aiosqlite:///./neardrop.db` |
+| `JWT_SECRET_KEY` | Secret for signing JWTs — **keep private** | 64-char hex string |
+| `JWT_ALGORITHM` | JWT signing algorithm | `HS256` |
+| `JWT_EXPIRY_DAYS` | Token validity in days | `30` |
+
+### Azure Services (Optional — graceful fallback if absent)
+
+| Variable | Service | Where to find it |
+|---|---|---|
+| `AZURE_SPEECH_KEY` | Speech-to-Text + Text-to-Speech | `portal.azure.com` → Speech resource → **Keys and Endpoint** |
+| `AZURE_SPEECH_REGION` | Region for Speech (e.g. `centralindia`) | Same page as above |
+| `AZURE_MAPS_SUBSCRIPTION_KEY` | Geocoding + Navigation routes | `portal.azure.com` → Maps account → **Authentication** |
+| `AZURE_COMMUNICATION_CONNECTION_STRING` | SMS OTP to drivers | `portal.azure.com` → ACS resource → **Keys** |
+| `AZURE_COMMUNICATION_SENDER_PHONE` | ACS sender phone number | `portal.azure.com` → ACS resource → **Phone numbers** |
+
+### Email — Customer OTP (Optional)
+
+Sent when a hub accepts a package. Uses Gmail SMTP with an App Password.
+
+```env
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your-gmail@gmail.com
+SMTP_PASSWORD=your-16-char-app-password   # NOT your Gmail login password
+SMTP_SENDER_NAME=NearDrop
+```
+
+> **Gmail Setup:** Enable 2FA → [myaccount.google.com](https://myaccount.google.com) → Security → **App Passwords** → Generate a 16-character password.
+
+### Firebase — Push Notifications (Optional)
+
+Push notifications are fire-and-forget. The app works without Firebase.
+
+1. Go to [console.firebase.google.com](https://console.firebase.google.com) → create a project.
+2. Add an **Android app** with package name `com.example.neardrop`.
+3. Download `google-services.json` → place at `mobile/android/app/google-services.json`.
+4. Project Settings → **Service Accounts** → **Generate new private key**.
+5. Paste the entire JSON as a single line in `.env`:
+   ```env
+   FIREBASE_SERVICE_ACCOUNT_JSON={"type":"service_account","project_id":"..."}
+   ```
+
+### Dispatcher Portal (Next.js)
+
+```env
+NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=<generate with: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))">
+```
+
+---
+
+## Dispatcher Portal — CSV Batch Upload
+
+Upload a CSV on the Dispatcher dashboard to create a delivery batch. Required columns:
+
+```csv
 delivery_id,customer_name,customer_email,customer_phone,delivery_address
 ND10001,Priya Sharma,priya@gmail.com,9876543210,"Flat 12 Jubilee Hills Hyderabad 500033"
 ND10002,Rahul Verma,rahul@gmail.com,9876543211,"Plot 45 Gachibowli Hyderabad 500032"
@@ -225,13 +320,63 @@ ND10002,Rahul Verma,rahul@gmail.com,9876543211,"Plot 45 Gachibowli Hyderabad 500
 
 | Column | Required | Description |
 |---|---|---|
-| `delivery_id` | Yes | Unique order reference (e.g. `ND10001`) |
-| `customer_name` | Yes | Recipient display name |
-| `customer_email` | Yes | Used to send hub drop OTP |
-| `customer_phone` | Yes | 10-digit mobile number |
-| `delivery_address` | Yes | Full text address — geocoded via Azure Maps |
+| `delivery_id` | ✅ | Unique order reference (e.g. `ND10001`) |
+| `customer_name` | ✅ | Recipient display name |
+| `customer_email` | ✅ | Used to send hub-drop OTP |
+| `customer_phone` | ✅ | 10-digit mobile number |
+| `delivery_address` | ✅ | Full text address — geocoded via Azure Maps |
 
 The backend geocodes all addresses concurrently, then runs the nearest-neighbor queue ordering engine to sequence stops optimally before assigning the batch to the driver.
+
+---
+
+## API Reference
+
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| `POST` | `/auth/login` | — | Phone + password login → returns JWT |
+| `GET` | `/auth/me` | JWT | Current user profile |
+| `GET` | `/driver/{id}/score` | JWT | Trust score + recent delivery history |
+| `GET` | `/driver/{id}/active_delivery` | JWT | Current active delivery |
+| `POST` | `/driver/fcm-token` | JWT | Register device push token |
+| `POST` | `/delivery/fail` | JWT | Mark delivery failed → triggers hub broadcast |
+| `POST` | `/delivery/{id}/complete` | JWT | Mark delivery as completed |
+| `GET` | `/hubs/nearby` | JWT | Hubs within 2km of coordinates |
+| `GET` | `/hubs/{id}/active_broadcasts` | JWT | Pending broadcasts for a hub |
+| `GET` | `/hubs/{id}/stored_packages` | JWT | Packages accepted and awaiting customer OTP |
+| `GET` | `/hubs/{id}/stats` | JWT | Hub earnings and trust score |
+| `POST` | `/hub/accept` | JWT | Accept broadcast → generates pickup code + sends customer OTP email |
+| `POST` | `/delivery/{id}/verify-otp` | JWT | Verify customer OTP at hub handoff |
+| `POST` | `/delivery/{id}/resend-otp` | JWT | Resend OTP email to customer |
+| `GET` | `/dashboard/stats` | JWT | Fleet-wide stats and CO₂ saved |
+| `GET` | `/dashboard/fleet` | JWT | All driver positions and statuses |
+| `GET` | `/dashboard/hourly` | JWT | Hourly delivery/failure counts |
+| `GET` | `/dashboard/leaderboard` | JWT | Drivers ranked by completions + trust score |
+| `POST` | `/dispatcher/auth/login` | — | Email + password login for dispatchers |
+| `GET` | `/dispatcher/drivers` | JWT | All drivers with live stats |
+| `POST` | `/dispatcher/batches` | JWT | Upload CSV → create a delivery batch |
+| `GET` | `/dispatcher/deliveries` | JWT | All deliveries with filtering |
+| `GET` | `/navigation/route` | JWT | Turn-by-turn route between two coordinates |
+| `POST` | `/voice/azure-token` | JWT | Short-lived Azure Speech token for Flutter |
+| `WS` | `/ws` | — | WebSocket — real-time delivery events |
+| `GET` | `/health` | — | Health check (DB status) |
+
+Full interactive docs available at `http://localhost:8000/docs` (Swagger UI).
+
+---
+
+## Design Decisions & Production Roadmap
+
+| Concern | Current (Development) | Production Path |
+|---|---|---|
+| **Database** | SQLite (file-based) | Azure PostgreSQL Flexible Server |
+| **Geosearch** | Haversine in Python, loads all hubs | PostGIS `ST_DWithin` with GIST index |
+| **WebSocket** | In-memory `ConnectionManager` | Redis Pub/Sub (multi-worker safe) |
+| **Auth** | JWT, 30-day expiry, bcrypt | Same — no changes needed |
+| **Push** | Firebase FCM, fire-and-forget | Same |
+| **Geocoding** | Azure Maps, concurrent via `asyncio.gather` | Same |
+| **Queue ordering** | Nearest-neighbor greedy (Haversine) | OR-Tools VRP solver for large batches |
+| **OTP email** | Gmail SMTP via `BackgroundTasks` | SendGrid / Azure Communication Services Email |
 
 ---
 
@@ -243,96 +388,48 @@ The backend geocodes all addresses concurrently, then runs the nearest-neighbor 
 # Log in to Azure Container Registry
 az acr login --name <your-registry-name>
 
-# Build and tag
-docker build -t <your-registry-name>.azurecr.io/neardrop-backend:latest ./backend
-
-# Push
-docker push <your-registry-name>.azurecr.io/neardrop-backend:latest
+# Build, tag, and push
+docker build -t <your-registry>.azurecr.io/neardrop-backend:latest ./backend
+docker push <your-registry>.azurecr.io/neardrop-backend:latest
 ```
 
-### 2. Deploy to App Service
+### 2. Create the App Service
 
 ```bash
 az webapp create \
   --resource-group <your-rg> \
   --plan <your-plan> \
   --name neardrop-api \
-  --deployment-container-image-name <your-registry-name>.azurecr.io/neardrop-backend:latest
+  --deployment-container-image-name <your-registry>.azurecr.io/neardrop-backend:latest
 ```
 
 ### 3. Set environment variables
 
-In the Azure Portal: **App Service → Configuration → Application settings**, add every variable from `.env.example` with your production values.
+In the Azure Portal: **App Service → Configuration → Application Settings**, add every key from `.env`.
 
 Or via CLI:
 ```bash
 az webapp config appsettings set \
   --resource-group <your-rg> \
   --name neardrop-api \
-  --settings DATABASE_URL="postgresql+asyncpg://..." JWT_SECRET_KEY="..." ...
+  --settings \
+    DATABASE_URL="postgresql+asyncpg://..." \
+    JWT_SECRET_KEY="..." \
+    AZURE_SPEECH_KEY="..." \
+    AZURE_MAPS_SUBSCRIPTION_KEY="..."
+```
+
+### 4. Update the Flutter app for production
+
+In `mobile/lib/core/config/app_config.dart`, update the production URL:
+```dart
+static String get baseUrl => kIsWeb
+    ? 'https://neardrop-api.azurewebsites.net'  // web
+    : 'https://neardrop-api.azurewebsites.net'; // mobile
 ```
 
 ---
 
-## Architecture
+## License
 
-```mermaid
-graph TD
-    A[Flutter Mobile App] -->|REST + JWT| B[FastAPI Backend]
-    A -->|WebSocket /ws| B
-    I[Next.js Dispatcher Portal] -->|REST + JWT cookie| B
-    B --> C[(SQLite / PostgreSQL)]
-    B --> D[Azure Speech Services]
-    B --> E[Azure Maps — geocoding]
-    B --> F[Azure Communication Services — SMS]
-    B --> G[Firebase FCM — push]
-    B --> H[WebSocket Manager\nin-memory broadcast]
-    B --> J[SMTP — customer OTP email]
-```
-
-### Key design decisions
-
-| Decision | Current implementation | Production path |
-|---|---|---|
-| Database | SQLite (dev) / PostgreSQL (prod) | Azure PostgreSQL Flexible Server |
-| Geosearch | Haversine in Python, loads all hubs | PostGIS `ST_DWithin` with GIST index |
-| WebSocket | In-memory `ConnectionManager` | Redis pub/sub (multi-worker safe) |
-| Auth | JWT, 30-day expiry, bcrypt passwords | Same — no changes needed |
-| Push notifications | Firebase FCM, fire-and-forget | Same |
-| Geocoding | Azure Maps, concurrent via `asyncio.gather` | Same |
-| Queue ordering | Nearest-neighbor greedy Haversine | OR-Tools VRP solver for large batches |
-| OTP email | smtplib STARTTLS via `BackgroundTasks` | SendGrid / Azure Communication Services Email |
-| Dispatcher auth | Separate `Dispatcher` table, email-based JWT with `role: dispatcher` | Same |
-
-### API routes
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/auth/login` | Phone + password login, returns JWT |
-| `GET` | `/auth/me` | Current user profile |
-| `GET` | `/driver/{id}/score` | Trust score + recent delivery history |
-| `GET` | `/driver/{id}/active_delivery` | Current active delivery |
-| `POST` | `/driver/fcm-token` | Register device push token |
-| `POST` | `/delivery/fail` | Mark delivery failed, trigger hub broadcast |
-| `POST` | `/delivery/{id}/complete` | Mark delivery as delivered |
-| `GET` | `/hubs/nearby` | Hubs within radius of coordinates |
-| `GET` | `/hubs/{id}/active_broadcasts` | Pending broadcasts for a hub |
-| `GET` | `/hubs/{id}/stored_packages` | Packages accepted and awaiting customer OTP |
-| `POST` | `/hub/accept` | Accept a broadcast, receive pickup code, send customer OTP email |
-| `POST` | `/hub/confirm-pickup` | Mark package collected by customer, advance driver queue |
-| `POST` | `/delivery/{id}/verify-otp` | Verify customer OTP at hub handoff |
-| `POST` | `/delivery/{id}/resend-otp` | Resend OTP email to customer |
-| `GET` | `/dashboard/stats` | Fleet-wide stats and CO₂ saved |
-| `GET` | `/dashboard/fleet` | All driver positions and statuses |
-| `GET` | `/dashboard/hourly` | Hourly delivery/failure counts |
-| `GET` | `/dashboard/leaderboard` | Drivers ranked by completions + trust |
-| `POST` | `/dispatcher/auth/login` | Email + password login for dispatchers |
-| `GET` | `/dispatcher/drivers` | All drivers with live stats |
-| `GET` | `/dispatcher/stats` | Fleet summary stats for dispatcher view |
-| `POST` | `/dispatcher/batches` | Upload CSV and create a delivery batch |
-| `GET` | `/dispatcher/batches` | List all batches |
-| `GET` | `/dispatcher/batches/{id}` | Batch detail with ordered delivery queue |
-| `GET` | `/dispatcher/deliveries` | All deliveries with filtering |
-| `POST` | `/voice/azure-token` | Short-lived Azure Speech token for Flutter |
-| `WS` | `/ws` | Real-time delivery events |
-| `GET` | `/health` | Health check |
+MIT © NearDrop Contributors
