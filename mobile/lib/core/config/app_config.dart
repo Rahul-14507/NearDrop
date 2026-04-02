@@ -19,4 +19,4 @@ class AppConfig {
 
   // ── Environment ──────────────────────────────────────────
   static const bool isProduction = false;
-} 
+}
