@@ -13,12 +13,14 @@ class HubDropSheet extends StatelessWidget {
   final List<NearbyHubModel> hubs;
   final bool isLoading;
   final NearbyHubModel? autoAssignedHub;
+  final Widget? header;
 
   const HubDropSheet({
     super.key,
     required this.hubs,
     this.isLoading = false,
     this.autoAssignedHub,
+    this.header,
   });
 
   @override
@@ -46,6 +48,12 @@ class HubDropSheet extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 20),
+
+          if (header != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 20),
+              child: header!,
+            ),
 
           if (isLoading || (hubs.isEmpty && autoAssignedHub == null)) ...[
             const SizedBox(height: 16),

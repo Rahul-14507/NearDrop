@@ -54,7 +54,7 @@ async def get_active_delivery(driver_id: int, db: AsyncSession = Depends(get_db)
         select(Delivery)
         .where(
             Delivery.driver_id == driver_id,
-            Delivery.status.in_([DeliveryStatus.en_route, DeliveryStatus.arrived, DeliveryStatus.failed])
+            Delivery.status.in_([DeliveryStatus.en_route, DeliveryStatus.arrived])
         )
         .order_by(Delivery.created_at.desc())
         .limit(1)

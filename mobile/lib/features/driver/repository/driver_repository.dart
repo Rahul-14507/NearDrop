@@ -60,6 +60,15 @@ class DriverRepository {
     }
   }
 
+  Future<ApiResponse<bool>> markHubDelivered(int deliveryId) async {
+    try {
+      await _api.post('/delivery/$deliveryId/hub-complete');
+      return const ApiResponse.success(true);
+    } catch (e) {
+      return ApiResponse.failure(e.toString());
+    }
+  }
+
   Future<ApiResponse<List<Map<String, dynamic>>>> getDeliveryHistory(
       int driverId) async {
     try {

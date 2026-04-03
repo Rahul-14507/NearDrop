@@ -300,6 +300,33 @@ async def verify_otp(
     )
 
 
+@router.post("/{delivery_id}/hub-complete", response_model=DeliveryCompleteResponse)
+async def hub_complete_delivery(
+    delivery_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    result = await db.execute(select(Delivery).where(Delivery.id == delivery_id))
+    delivery = result.scalar_one_or_none()
+    if not delivery:
+        raise HTTPException(status_code=404, detail="Delivery not found")
+
+    delivery.status = DeliveryStatus.hub_delivered
+    delivery.delivered_at = datetime.utcnow()
+    await db.commit()
+
+    await manager.broadcast("delivery_hub_completed", {
+        "delivery_id": delivery.id,
+        "driver_id": delivery.driver_id,
+        "address": delivery.address,
+    })
+
+    # Advance the batch queue
+    await _push_next_or_complete(delivery, db)
+
+    return DeliveryCompleteResponse(success=True, delivery_id=delivery.id)
+
+
 @router.post("/{delivery_id}/resend-otp")
 async def resend_otp(
     delivery_id: int,

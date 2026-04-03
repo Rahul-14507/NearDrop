@@ -24,6 +24,7 @@ from routes import tts as tts_router
 from routes import navigation as navigation_router
 from routes import calling as calling_router
 from routes import batch as batch_router
+from routes import public as public_router
 from limiter import limiter
 
 logger = logging.getLogger(__name__)
@@ -32,6 +33,7 @@ logger = logging.getLogger(__name__)
 _OPEN_PREFIXES = (
     "/health",
     "/auth/",
+    "/public/",
     "/docs",
     "/redoc",
     "/openapi.json",
@@ -133,6 +135,7 @@ app.add_middleware(
 # Auth and voice first (open or semi-open)
 app.include_router(auth_router.router)
 app.include_router(voice_router.router)
+app.include_router(public_router.router)
 
 # Core business routes (all protected by middleware above)
 app.include_router(delivery.router)

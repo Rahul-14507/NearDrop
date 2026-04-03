@@ -40,7 +40,7 @@ class DeliveryStatusCard extends StatelessWidget {
   }
 
   bool get _isFinal =>
-      delivery.status == 'delivered' || delivery.status == 'failed';
+      delivery.status == 'delivered' || delivery.status == 'hub_delivered';
 
   @override
   Widget build(BuildContext context) {
@@ -188,14 +188,24 @@ class DeliveryStatusCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Expanded(
-                    child: _ActionButton(
-                      label: AppStrings.markFailed,
-                      icon: Icons.cancel_outlined,
-                      color: AppColors.error,
-                      onTap: () => onStatusChange!('failed'),
+                  if (delivery.status != 'failed')
+                    Expanded(
+                      child: _ActionButton(
+                        label: AppStrings.markFailed,
+                        icon: Icons.cancel_outlined,
+                        color: AppColors.error,
+                        onTap: () => onStatusChange!('failed'),
+                      ),
                     ),
-                  ),
+                  if (delivery.status == 'failed')
+                    Expanded(
+                      child: _ActionButton(
+                        label: "Mark Hub Delivered",
+                        icon: Icons.home_work_outlined,
+                        color: AppColors.accent,
+                        onTap: () => onStatusChange!('hub_delivered'),
+                      ),
+                    ),
                 ],
               ),
             ],

@@ -11,6 +11,7 @@ class DeliveryBloc extends Bloc<DeliveryEvent, DeliveryState> {
     on<DeliveryLoadRequested>(_onLoad);
     on<DeliveryFailRequested>(_onFail);
     on<DeliveryCompleteRequested>(_onComplete);
+    on<DeliveryHubCompleteRequested>(_onHubComplete);
   }
 
   Future<void> _onLoad(
@@ -60,6 +61,19 @@ class DeliveryBloc extends Bloc<DeliveryEvent, DeliveryState> {
       emit(DeliveryCompleted(event.deliveryId));
     } else {
       emit(DeliveryError(result.error ?? 'Failed to complete delivery'));
+    }
+  }
+
+  Future<void> _onHubComplete(
+    DeliveryHubCompleteRequested event,
+    Emitter<DeliveryState> emit,
+  ) async {
+    emit(const DeliveryLoading());
+    final result = await _repository.markHubDelivered(event.deliveryId);
+    if (result.isSuccess) {
+      emit(DeliveryCompleted(event.deliveryId));
+    } else {
+      emit(DeliveryError(result.error ?? 'Failed to complete hub drop'));
     }
   }
 }

@@ -15,6 +15,7 @@ import 'package:neardrop/core/services/azure_tts_service.dart';
 import 'package:neardrop/core/services/navigation_engine.dart';
 import 'package:neardrop/core/theme/app_theme.dart';
 import 'package:neardrop/features/driver/bloc/delivery_bloc.dart';
+import 'package:neardrop/features/driver/bloc/driver_bloc.dart';
 import 'package:neardrop/features/driver/bloc/delivery_event.dart';
 import 'package:neardrop/features/driver/bloc/delivery_state.dart';
 import 'package:neardrop/features/driver/bloc/voice_bloc.dart';
@@ -60,6 +61,8 @@ class _ActiveDeliveryScreenState extends State<ActiveDeliveryScreen>
 
   // WS subscription
   StreamSubscription<Map<String, dynamic>>? _wsSub;
+  List<NearbyHubModel>? _nearbyHubs;
+  NearbyHubModel? _autoAssignedHub;
 
   // next_delivery success animation
   bool _showNextDeliveryAnimation = false;
@@ -747,6 +750,56 @@ class _ActiveDeliveryScreenState extends State<ActiveDeliveryScreen>
           child: CircularProgressIndicator(color: AppColors.accent));
     }
 
+    if (delivery.status == 'failed') {
+      return Stack(
+        children: [
+          _PreNavigationView(
+            delivery: delivery,
+            currentLocation: _currentLocation ?? _defaultLocation,
+            mapController: _mapController,
+            onStartNavigation: () => _startNavigation(delivery),
+            onStatusChange: (status) {
+              if (status == 'delivered') {
+                context
+                    .read<DeliveryBloc>()
+                    .add(DeliveryCompleteRequested(delivery.id));
+              } else if (status == 'failed') {
+                final loc = _currentLocation ?? _defaultLocation;
+                context.read<DeliveryBloc>().add(DeliveryFailRequested(
+                      deliveryId: delivery.id,
+                      lat: loc.latitude,
+                      lng: loc.longitude,
+                    ));
+              } else if (status == 'hub_delivered') {
+                context
+                    .read<DeliveryBloc>()
+                    .add(DeliveryHubCompleteRequested(delivery.id));
+              }
+            },
+          ),
+          DraggableScrollableSheet(
+            initialChildSize: 0.45,
+            minChildSize: 0.25,
+            maxChildSize: 0.9,
+            builder: (_, controller) => HubDropSheet(
+              hubs: _nearbyHubs ?? [],
+              autoAssignedHub: _autoAssignedHub,
+              header: DeliveryStatusCard(
+                delivery: delivery,
+                onStatusChange: (status) {
+                  if (status == 'hub_delivered') {
+                    context
+                        .read<DeliveryBloc>()
+                        .add(DeliveryHubCompleteRequested(delivery.id));
+                  }
+                },
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
     if (_navigationStarted && _navState != null) {
       return _NavigationView(
         delivery: delivery,
@@ -782,6 +835,10 @@ class _ActiveDeliveryScreenState extends State<ActiveDeliveryScreen>
                 lat: loc.latitude,
                 lng: loc.longitude,
               ));
+        } else if (status == 'hub_delivered') {
+          context
+              .read<DeliveryBloc>()
+              .add(DeliveryHubCompleteRequested(delivery.id));
         }
       },
     );
@@ -881,28 +938,29 @@ class _PreNavigationView extends StatelessWidget {
                   onStatusChange: onStatusChange,
                 ),
                 const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.accent,
-                      foregroundColor: AppColors.background,
-                      minimumSize: const Size.fromHeight(52),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
+                if (delivery.status != 'failed')
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.accent,
+                        foregroundColor: AppColors.background,
+                        minimumSize: const Size.fromHeight(52),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
                       ),
-                    ),
-                    icon: const Icon(Icons.rocket_launch_rounded, size: 20),
-                    label: const Text(
-                      'Start Navigation',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
+                      icon: const Icon(Icons.rocket_launch_rounded, size: 20),
+                      label: const Text(
+                        'Start Navigation',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
                       ),
+                      onPressed: onStartNavigation,
                     ),
-                    onPressed: onStartNavigation,
                   ),
-                ),
               ],
             ),
           ),
@@ -1499,6 +1557,7 @@ class _SuccessView extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 20),
+
           Text(
             AppStrings.deliveryComplete,
             style: Theme.of(context)

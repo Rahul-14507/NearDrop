@@ -39,3 +39,12 @@ class DeliveryCompleteRequested extends DeliveryEvent {
   @override
   List<Object?> get props => [deliveryId];
 }
+
+class DeliveryHubCompleteRequested extends DeliveryEvent {
+  final int deliveryId;
+
+  const DeliveryHubCompleteRequested(this.deliveryId);
+
+  @override
+  List<Object?> get props => [deliveryId];
+}
