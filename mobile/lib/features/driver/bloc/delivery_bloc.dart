@@ -31,9 +31,20 @@ class DeliveryBloc extends Bloc<DeliveryEvent, DeliveryState> {
     DeliveryFailRequested event,
     Emitter<DeliveryState> emit,
   ) async {
+    if (state is DeliveryLoading) return; // Prevent double taps
+
     DeliveryModel? currentDelivery;
     final current = state;
-    if (current is DeliveryLoaded) currentDelivery = current.delivery;
+    if (current is DeliveryLoaded) {
+      currentDelivery = current.delivery;
+    } else if (current is DeliveryFailed) {
+      currentDelivery = current.delivery;
+    }
+
+    if (currentDelivery == null) {
+      emit(const DeliveryError('Cannot fail delivery: context lost'));
+      return;
+    }
 
     emit(const DeliveryLoading());
     final result = await _repository.failDelivery(
@@ -41,7 +52,7 @@ class DeliveryBloc extends Bloc<DeliveryEvent, DeliveryState> {
       event.lat,
       event.lng,
     );
-    if (result.isSuccess && currentDelivery != null) {
+    if (result.isSuccess) {
       emit(DeliveryFailed(
         nearbyHubs: result.data ?? [],
         delivery: currentDelivery,

@@ -31,6 +31,17 @@ HUBS = [
     {"name": "Hitech City Kirana",         "owner_name": "Anand Sharma",     "lat": 17.4456, "lng": 78.3815, "hub_type": HubType.kirana,    "trust_score": 93, "today_earnings": 225.0},
     {"name": "Prestige Plaza Reception",   "owner_name": "Security: Rakesh", "lat": 17.4189, "lng": 78.4634, "hub_type": HubType.apartment, "trust_score": 85, "today_earnings": 100.0},
     {"name": "Jubilee Hills Mini Mart",    "owner_name": "Pallavi Rao",      "lat": 17.4312, "lng": 78.4089, "hub_type": HubType.kirana,    "trust_score": 90, "today_earnings": 175.0},
+    {"name": "Gachibowli Tech Hub",        "owner_name": "Arun Kumar",       "lat": 17.4420, "lng": 78.3640, "hub_type": HubType.kirana,    "trust_score": 92, "today_earnings": 110.0},
+    {"name": "Kukatpally Depot",           "owner_name": "Vamshi Krishna",   "lat": 17.4849, "lng": 78.4138, "hub_type": HubType.apartment, "trust_score": 85, "today_earnings": 60.0},
+    {"name": "LB Nagar Super Mart",        "owner_name": "Radha Reddy",      "lat": 17.3483, "lng": 78.5481, "hub_type": HubType.kirana,    "trust_score": 88, "today_earnings": 130.0},
+    {"name": "Mehdipatnam Medico",         "owner_name": "Aslam Khan",       "lat": 17.3948, "lng": 78.4326, "hub_type": HubType.pharmacy,  "trust_score": 96, "today_earnings": 190.0},
+    {"name": "Uppal Crossroads Mart",      "owner_name": "Praveen M",        "lat": 17.4018, "lng": 78.5602, "hub_type": HubType.kirana,    "trust_score": 89, "today_earnings": 140.0},
+    {"name": "Begumpet Towers",            "owner_name": "Security: Ramesh", "lat": 17.4447, "lng": 78.4664, "hub_type": HubType.apartment, "trust_score": 81, "today_earnings": 40.0},
+    {"name": "Dilsukhnagar Pharma",        "owner_name": "Dr. Sunitha",      "lat": 17.3685, "lng": 78.5316, "hub_type": HubType.pharmacy,  "trust_score": 94, "today_earnings": 210.0},
+    {"name": "Attapur Kirana",             "owner_name": "Ali Hassan",       "lat": 17.3601, "lng": 78.4239, "hub_type": HubType.kirana,    "trust_score": 87, "today_earnings": 105.0},
+    {"name": "Miyapur Central",            "owner_name": "Karthik Ch",       "lat": 17.4933, "lng": 78.3516, "hub_type": HubType.kirana,    "trust_score": 91, "today_earnings": 165.0},
+    {"name": "Tolichowki General Store",   "owner_name": "Imran Syed",       "lat": 17.4065, "lng": 78.4116, "hub_type": HubType.kirana,    "trust_score": 86, "today_earnings": 95.0},
+    {"name": "Sanath Nagar Pharmacy",      "owner_name": "Murali Mohan",     "lat": 17.4560, "lng": 78.4439, "hub_type": HubType.pharmacy,  "trust_score": 93, "today_earnings": 180.0},
 ]
 
 ADDRESSES = [
@@ -175,8 +186,8 @@ async def seed():
         # ── Seed standalone deliveries (50 spread across today) ───────────────
         base_time = datetime.utcnow().replace(hour=7, minute=0, second=0, microsecond=0)
         statuses = (
-            [DeliveryStatus.delivered] * 32 +
-            [DeliveryStatus.failed] * 8 +
+            [DeliveryStatus.delivered] * 37 +
+            [DeliveryStatus.failed] * 3 +
             [DeliveryStatus.en_route] * 7 +
             [DeliveryStatus.arrived] * 3
         )
@@ -189,6 +200,9 @@ async def seed():
             created = base_time + timedelta(minutes=offset_mins)
             delivered_at = created + timedelta(minutes=random.randint(15, 45)) if status == DeliveryStatus.delivered else None
 
+            lat = round(random.uniform(17.35, 17.48), 6)
+            lng = round(random.uniform(78.35, 78.50), 6)
+
             delivery = Delivery(
                 driver_id=driver.id,
                 address=random.choice(ADDRESSES),
@@ -199,6 +213,8 @@ async def seed():
                 delivered_at=delivered_at,
                 recipient_name=random.choice(RECIPIENT_NAMES),
                 order_id=f"ND{10100 + i}",
+                lat=lat,
+                lng=lng,
             )
             db.add(delivery)
 

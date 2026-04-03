@@ -484,6 +484,9 @@ async def list_all_deliveries(
             hub_otp_verified=d.hub_otp_verified,
             hub_otp_sent_at=d.hub_otp_sent_at,
             created_at=d.created_at,
+            lat=d.lat,
+            lng=d.lng,
+            failure_reason=d.failure_reason,
         ))
     return output
 

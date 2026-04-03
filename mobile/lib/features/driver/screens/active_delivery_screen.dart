@@ -519,7 +519,14 @@ class _ActiveDeliveryScreenState extends State<ActiveDeliveryScreen>
                 );
               }
             },
-            child: BlocBuilder<DeliveryBloc, DeliveryState>(
+            child: BlocConsumer<DeliveryBloc, DeliveryState>(
+              listener: (context, state) {
+                if (state is DeliveryFailed) {
+                  setState(() {
+                    _nearbyHubs = state.nearbyHubs;
+                  });
+                }
+              },
               builder: (context, state) {
                 return Column(
                   children: [
@@ -735,22 +742,20 @@ class _ActiveDeliveryScreenState extends State<ActiveDeliveryScreen>
       );
     }
 
-    if (state is DeliveryFailed) {
-      return DraggableScrollableSheet(
-        initialChildSize: 0.5,
-        minChildSize: 0.3,
-        maxChildSize: 0.9,
-        builder: (_, controller) => HubDropSheet(hubs: state.nearbyHubs),
-      );
+    DeliveryModel? maybeDelivery;
+    if (state is DeliveryLoaded) {
+      maybeDelivery = state.delivery;
+    } else if (state is DeliveryFailed) {
+      maybeDelivery = state.delivery;
     }
 
-    final delivery = state is DeliveryLoaded ? state.delivery : null;
-    if (delivery == null) {
+    if (maybeDelivery == null) {
       return const Center(
           child: CircularProgressIndicator(color: AppColors.accent));
     }
+    final DeliveryModel delivery = maybeDelivery;
 
-    if (delivery.status == 'failed') {
+    if (delivery.status == 'failed' || state is DeliveryFailed) {
       return Stack(
         children: [
           _PreNavigationView(

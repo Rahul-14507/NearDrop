@@ -11,18 +11,20 @@ export const IncidentsApi = {
       const data = await response.json();
       
       // Map backend DispatcherDeliveryListOut to frontend Incident
-      const incidents: Incident[] = data.map((d: any) => ({
-        id: String(d.id),
-        deliveryId: d.order_id,
-        driverId: String(d.driver_id),
-        location: d.address,
-        coordinates: { lat: d.lat || 17.43, lng: d.lng || 78.44 }, // Default to Hyderabad center if missing
-        timestamp: d.created_at,
-        status: mapStatus(d.status),
-        failureReason: d.failure_reason || 'Delivery failed',
-        severity: 'high',
-        slaDeadline: new Date(new Date(d.created_at).getTime() + 1800000).toISOString()
-      }));
+      const incidents: Incident[] = data
+        .filter((d: any) => d.lat != null && d.lng != null) // Skip deliveries with no geocoords
+        .map((d: any) => ({
+          id: String(d.id),
+          deliveryId: d.order_id,
+          driverId: String(d.driver_id),
+          location: d.address,
+          coordinates: { lat: d.lat, lng: d.lng },
+          timestamp: d.created_at,
+          status: mapStatus(d.status),
+          failureReason: d.failure_reason || 'Delivery failed',
+          severity: 'high',
+          slaDeadline: new Date(new Date(d.created_at).getTime() + 1800000).toISOString()
+        }));
 
       return {
         success: true,

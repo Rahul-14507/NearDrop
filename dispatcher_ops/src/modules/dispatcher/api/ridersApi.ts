@@ -1,5 +1,5 @@
 import { fetchWithAuth } from './apiClient';
-import type { Rider, ApiResponse, RiderStatus } from '../types/dispatcher.types';
+import type { Rider, ApiResponse } from '../types/dispatcher.types';
 
 export const RidersApi = {
   getRealtimeFleet: async (): Promise<ApiResponse<Rider[]>> => {

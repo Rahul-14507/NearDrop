@@ -292,6 +292,9 @@ class DispatcherDeliveryListOut(BaseModel):
     hub_otp_verified: Optional[bool] = None
     hub_otp_sent_at: Optional[datetime] = None
     created_at: datetime
+    lat: Optional[float] = None
+    lng: Optional[float] = None
+    failure_reason: Optional[str] = None
 
 
 # --- Dispatcher Hub Management ---
