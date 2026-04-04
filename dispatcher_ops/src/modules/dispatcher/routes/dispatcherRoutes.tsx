@@ -24,7 +24,7 @@ import { DashboardPage } from '../pages/DashboardPage';
 import { IncidentsPage } from '../pages/IncidentsPage';
 import { MapPage } from '../pages/MapPage';
 import { RidersPage } from '../pages/RidersPage';
-import { AlertsPage } from '../pages/AlertsPage';
+
 import { AnalyticsPage } from '../pages/AnalyticsPage';
 import { DispatchCenterPage } from '../pages/DispatchCenterPage';
 
@@ -48,7 +48,7 @@ export const dispatcherRoutes = (
       <Route path="incidents" element={<IncidentsPage />} />
       <Route path="map" element={<MapPage />} />
       <Route path="riders" element={<RidersPage />} />
-      <Route path="alerts" element={<AlertsPage />} />
+
       <Route path="analytics" element={<AnalyticsPage />} />
       <Route path="dispatch" element={<DispatchCenterPage />} />
       {/* Fallback: redirect unknown sub-paths to dashboard */}

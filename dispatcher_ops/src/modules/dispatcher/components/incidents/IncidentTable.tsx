@@ -6,19 +6,18 @@ interface IncidentTableProps {
   incidents: Incident[];
   loading?: boolean;
   onResolve: (id: string) => void;
-  onEscalate: (id: string) => void;
-  onAutoAssign: (id: string) => void;
+  onAssign: (id: string) => void;
 }
 
 type FilterStatus = 'All' | IncidentStatus;
 
 const columns = ['Delivery ID', 'Driver ID', 'Location', 'Time', 'Status', 'Actions'];
 
-export const IncidentTable: React.FC<IncidentTableProps> = ({ incidents, loading, onResolve, onEscalate, onAutoAssign }) => {
+export const IncidentTable: React.FC<IncidentTableProps> = ({ incidents, loading, onResolve, onAssign }) => {
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('All');
   const [searchQuery, setSearchQuery] = useState('');
 
-  const filterOptions: FilterStatus[] = ['All', 'NEW', 'PENDING', 'ASSIGNED', 'IN_PROGRESS', 'ESCALATED', 'RESOLVED'];
+  const filterOptions: FilterStatus[] = ['All', 'NEW', 'PENDING', 'ASSIGNED', 'IN_PROGRESS', 'RESOLVED'];
 
   const filtered = incidents
     .filter((i) => filterStatus === 'All' || i.status === filterStatus)
@@ -111,8 +110,7 @@ export const IncidentTable: React.FC<IncidentTableProps> = ({ incidents, loading
                   incident={incident}
                   index={idx}
                   onResolve={onResolve}
-                  onEscalate={onEscalate}
-                  onAutoAssign={onAutoAssign}
+                  onAssign={onAssign}
                 />
               ))
             ) : (

@@ -5,6 +5,39 @@ import logging
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime
+import os
+from dotenv import load_dotenv
+
+env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
+
+# load_dotenv can't handle multi-line values (Firebase JSON block), so we
+# read the file ourselves and set only the simple single-line key=value pairs
+def _load_env_safe(path: str) -> None:
+    if not os.path.exists(path):
+        return
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            line = line.rstrip("\n\r")
+            # Skip comments, blank lines, and lines that are part of multi-line blocks
+            if not line or line.lstrip().startswith("#") or "=" not in line:
+                continue
+            key, _, val = line.partition("=")
+            key = key.strip()
+            val = val.strip()
+            # Skip if value contains unmatched braces (multi-line JSON)
+            if val.startswith("{") and not val.endswith("}"):
+                continue
+            # Strip inline comments (e.g.  # comment)
+            if "  #" in val:
+                val = val[:val.index("  #")].strip()
+            elif "\t#" in val:
+                val = val[:val.index("\t#")].strip()
+            # Strip surrounding quotes
+            if len(val) >= 2 and val[0] in ('"', "'") and val[-1] == val[0]:
+                val = val[1:-1]
+            os.environ[key] = val
+
+_load_env_safe(env_path)
 
 import structlog
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect

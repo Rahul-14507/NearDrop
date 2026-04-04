@@ -1,73 +1,46 @@
-# React + TypeScript + Vite
+# NearDrop Dispatcher Operations Portal
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A next-generation logistics and intelligence dispatch platform built dynamically for high-scale order fulfillment. The portal incorporates automated deterministic business logic engines for Trust Scores, Sustainability (Carbon Reduction), and Operator Cost optimization.
 
-Currently, two official plugins are available:
+## 🚀 Quick Start (Zero Config)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+The architecture is built cleanly to spin up out of the box with zero external configuration. 
 
-## React Compiler
+### 1. Backend Setup (FastAPI & Database)
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+The backend utilizes SQLite natively for rapid local environments, so no containerization or external PostgreSQL setup is strictly needed out of the box.
 
-## Expanding the ESLint configuration
+```bash
+cd backend
+python -m venv venv
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+# On Windows: 
+venv\Scripts\activate
+# On Mac/Linux: 
+source venv/bin/activate
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+# Install strictly verified dependencies
+pip install -r requirements.txt
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+# Populate realistic deterministic operations data across 7 cities
+python seed.py
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+# Launch the FastAPI engine on localhost:8000
+uvicorn main:app --reload
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### 2. Frontend Setup (React & Vite)
+The frontend utilizes a zero-config proxy out of the box (`vite.config.ts` natively proxies `/api` to `localhost:8000`). No manual `.env` file is required to connect to the local python engine.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+```bash
+# Return to the project root and install
+npm install
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+# Start the Vite server
+npm run dev
 ```
+
+Navigate to `http://localhost:5173`. 
+The default operations portal login credentials are automatically generated via `seed.py`:
+- **Email:** `dispatcher@neardrop.in`
+- **Password:** `dispatch123`

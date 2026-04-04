@@ -49,6 +49,7 @@ class Driver(Base):
     fcm_token = Column(String(255), nullable=True)
     last_ping_at = Column(DateTime, nullable=True)
     acs_user_id = Column(String(255), nullable=True)
+    city = Column(String(50), nullable=True)
 
     deliveries = relationship("Delivery", back_populates="driver")
 
@@ -68,6 +69,7 @@ class Hub(Base):
     capacity = Column(Integer, default=10)
     current_load = Column(Integer, default=0)
     owner_phone = Column(String(20), nullable=True)
+    city = Column(String(50), nullable=True)
     total_accepted_all_time = Column(Integer, default=0)
 
     broadcasts = relationship("HubBroadcast", back_populates="hub")
@@ -133,6 +135,7 @@ class Delivery(Base):
     hub_otp = Column(String(6), nullable=True)
     hub_otp_verified = Column(Boolean, default=False)
     hub_otp_sent_at = Column(DateTime, nullable=True)
+    city = Column(String(50), nullable=True)
 
     driver = relationship("Driver", back_populates="deliveries")
     hub = relationship("Hub")

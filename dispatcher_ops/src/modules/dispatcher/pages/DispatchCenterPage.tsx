@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { fetchWithAuth } from '../api/apiClient';
 import { useAuthStore } from '../store/authStore';
+import { useCityStore } from '../store/cityStore';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -11,6 +12,7 @@ interface Driver {
   today_assigned: number;
   today_completed: number;
   today_failed: number;
+  city: string;
 }
 
 interface BatchDelivery {
@@ -23,10 +25,10 @@ interface BatchDelivery {
 }
 
 interface Batch {
-  id: number;
   batch_code: string;
   driver_id: number;
   driver_name: string;
+  city: string;
   total_deliveries: number;
   deliveries: BatchDelivery[];
   uploadedAt?: string;
@@ -56,6 +58,7 @@ function parseCsvText(text: string): { headers: string[]; rows: Record<string, s
 
 export const DispatchCenterPage: React.FC = () => {
   const token = useAuthStore(s => s.token);
+  const selectedCity = useCityStore(s => s.selectedCity);
 
   // Driver list
   const [drivers, setDrivers] = useState<Driver[]>([]);
@@ -83,7 +86,8 @@ export const DispatchCenterPage: React.FC = () => {
     const load = async () => {
       setDriversLoading(true);
       try {
-        const r = await fetchWithAuth('/api/dispatcher/drivers');
+        const query = selectedCity && selectedCity !== 'All Cities' ? `?city=${encodeURIComponent(selectedCity)}` : '';
+        const r = await fetchWithAuth(`/api/dispatcher/drivers${query}`);
         const data = await r.json();
         setDrivers(Array.isArray(data) ? data : data.drivers ?? []);
       } catch { /* ignore */ } finally {
@@ -91,14 +95,15 @@ export const DispatchCenterPage: React.FC = () => {
       }
     };
     load();
-  }, []);
+  }, [selectedCity]);
 
   // ── Load batches ─────────────────────────────────────────────────────────
   useEffect(() => {
     const load = async () => {
       setBatchesLoading(true);
       try {
-        const r = await fetchWithAuth('/api/dispatcher/batches');
+        const query = selectedCity && selectedCity !== 'All Cities' ? `?city=${encodeURIComponent(selectedCity)}` : '';
+        const r = await fetchWithAuth(`/api/dispatcher/batches${query}`);
         const data = await r.json();
         const list: Batch[] = Array.isArray(data) ? data : data.batches ?? [];
         // Enrich with live counts
@@ -112,25 +117,7 @@ export const DispatchCenterPage: React.FC = () => {
       }
     };
     load();
-  }, []);
-
-  // ── Delete batch ─────────────────────────────────────────────────────────
-  const handleDeleteBatch = async (batchId: number) => {
-    if (!window.confirm('Delete this batch? This will remove all associated deliveries.')) return;
-    try {
-      const r = await fetchWithAuth(`/api/dispatcher/batch/${batchId}`, {
-        method: 'DELETE',
-      });
-      if (r.ok) {
-        setBatches(prev => prev.filter(b => b.id !== batchId));
-        if (expandedBatch === batches.find(b => b.id === batchId)?.batch_code) {
-          setExpandedBatch(null);
-        }
-      }
-    } catch {
-      alert('Failed to delete batch');
-    }
-  };
+  }, [selectedCity]);
 
   // ── WebSocket live updates ─────────────────────────────────────────────
   useEffect(() => {
@@ -147,14 +134,14 @@ export const DispatchCenterPage: React.FC = () => {
         if (type === 'batch_assigned') {
           // New batch just uploaded — add to list
           setBatches(prev => {
-            const exists = prev.find(b => b.batch_code === msg.batch_code);
-            if (exists) return prev;
-            const driverName = drivers.find(d => d.id === msg.driver_id)?.name ?? `Driver #${msg.driver_id}`;
+            const driver = drivers.find(d => d.id === msg.driver_id);
+            const driverName = driver?.name ?? `Driver #${msg.driver_id}`;
+            const driverCity = driver?.city ?? 'Unknown';
             return [{
-              id: msg.id,
               batch_code: msg.batch_code,
               driver_id: msg.driver_id,
               driver_name: driverName,
+              city: driverCity,
               total_deliveries: msg.total_deliveries,
               deliveries: msg.deliveries ?? [],
               uploadedAt: new Date().toISOString(),
@@ -324,9 +311,11 @@ export const DispatchCenterPage: React.FC = () => {
                 style={{ borderColor: '#e2e8f0' }}
               >
                 <option value="">-- Choose a driver --</option>
-                {drivers.map(d => (
+                {drivers
+                  .filter(d => d.is_active && (selectedCity === 'All Cities' || d.city === selectedCity))
+                  .map(d => (
                   <option key={d.id} value={d.id}>
-                    {d.name} {!d.is_active && '(Offline)'} — Today: {d.today_assigned} assigned / {d.today_completed} done
+                    {d.name} ({d.city}) — Today: {d.today_assigned} assigned / {d.today_completed} done
                   </option>
                 ))}
               </select>
@@ -498,16 +487,18 @@ export const DispatchCenterPage: React.FC = () => {
                   <div key={i} className="h-16 bg-slate-100 rounded-xl animate-pulse" />
                 ))}
               </div>
-            ) : batches.length === 0 ? (
+            ) : batches.filter(b => selectedCity === 'All Cities' || b.city === selectedCity).length === 0 ? (
               <div className="p-12 text-center text-slate-400">
                 <svg className="w-10 h-10 mx-auto opacity-30 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                 </svg>
-                <p className="text-sm font-medium">No batches yet</p>
-                <p className="text-xs mt-1">Upload a CSV to create the first batch</p>
+                <p className="text-sm font-medium">No batches in {selectedCity}</p>
+                <p className="text-xs mt-1">Upload a CSV to create a batch for this city</p>
               </div>
             ) : (
-              batches.map(batch => {
+              batches
+                .filter(b => selectedCity === 'All Cities' || b.city === selectedCity)
+                .map(batch => {
                 const total = batch.total_deliveries;
                 const done = batch.completed ?? 0;
                 const failed = batch.failed ?? 0;
@@ -529,18 +520,6 @@ export const DispatchCenterPage: React.FC = () => {
                           </p>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteBatch(batch.id);
-                            }}
-                            className="p-1.5 hover:bg-red-50 text-slate-300 hover:text-red-500 rounded-md transition-all mr-2"
-                            title="Delete Batch"
-                          >
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
                           <span className="text-xl font-black" style={{ color: pct === 100 ? '#10b981' : '#3b82f6' }}>{pct}%</span>
                           <svg
                             className={`w-4 h-4 text-slate-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}

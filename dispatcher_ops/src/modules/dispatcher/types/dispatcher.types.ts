@@ -1,15 +1,22 @@
 // ─── Enums & State Machines ──────────────────────────────────────────────────
 
-export type IncidentStatus = 'NEW' | 'PENDING' | 'ASSIGNED' | 'IN_PROGRESS' | 'RESOLVED' | 'FAILED' | 'ESCALATED';
+export type IncidentStatus = 'NEW' | 'PENDING' | 'ASSIGNED' | 'IN_PROGRESS' | 'RESOLVED' | 'FAILED';
 export type IncidentSeverity = 'low' | 'medium' | 'high' | 'critical';
 
 export type RiderStatus = 'online' | 'offline' | 'idle' | 'on-delivery';
 
 export type HubRiskLevel = 'Safe' | 'Warning' | 'Critical';
 
-export type ActionType = 'AUTO_ASSIGN' | 'MANUAL_OVERRIDE' | 'ESCALATE' | 'RESOLVE' | 'ALERT_ACKNOWLEDGED';
+export type ActionType = 'ASSIGN' | 'RESOLVE' | 'ALERT_ACKNOWLEDGED';
 
 // ─── Core Entities ───────────────────────────────────────────────────────────
+
+export interface City {
+  id: string;
+  name: string;
+  coordinates: Coordinates;
+  zoom: number;
+}
 
 export interface Coordinates {
   lat: number;
@@ -22,6 +29,7 @@ export interface Incident {
   deliveryId: string;
   driverId: string;
   location: string;
+  city: string; // Dynamic city context
   coordinates: Coordinates;        // Failed delivery point
   driverCoordinates?: Coordinates; // Driver's current position (en route)
   timestamp: string;
@@ -37,7 +45,9 @@ export interface Rider {
   id: string;
   name?: string;
   zone: string;
+  city: string; // Dynamic city context
   score: number; // Delivery/Trust Score (0-100)
+  band?: string;
   status: RiderStatus;
   load: number;
   currentTask?: string;
@@ -51,6 +61,7 @@ export interface Rider {
 export interface Hub {
   id: string;
   zone: string;
+  city: string; // Dynamic city context
   activeLoad: number;
   maxCapacity: number;
   availableSlots: number;

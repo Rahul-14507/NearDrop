@@ -15,6 +15,7 @@ class DriverBase(BaseModel):
 class DriverOut(DriverBase):
     id: int
     vehicle: Optional[str] = None
+    city: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -43,6 +44,7 @@ class HubOut(BaseModel):
     availability: bool
     trust_score: int
     today_earnings: float
+    city: Optional[str] = None
     distance_m: Optional[float] = None
     eta_minutes: Optional[int] = None
 
@@ -75,6 +77,7 @@ class DeliveryOut(BaseModel):
     customer_phone: Optional[str] = None
     hub_otp_verified: Optional[bool] = None
     hub_otp_sent_at: Optional[datetime] = None
+    city: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -222,6 +225,8 @@ class DispatcherDriverOut(BaseModel):
     today_completed: int
     today_failed: int
     trust_score: int
+    band: Optional[str] = None
+    city: Optional[str] = None
 
 
 class DispatcherStatsOut(BaseModel):
@@ -233,6 +238,8 @@ class DispatcherStatsOut(BaseModel):
     pending_today: int
     success_rate_percent: float
     co2_saved_kg: float
+    co2_reduced_percent: float
+    cost_saved: float
     active_hubs: int
 
 
@@ -250,6 +257,7 @@ class DispatcherDeliveryOut(BaseModel):
     created_at: datetime
     hub_otp_verified: Optional[bool] = None
     hub_otp_sent_at: Optional[datetime] = None
+    city: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -291,10 +299,10 @@ class DispatcherDeliveryListOut(BaseModel):
     customer_phone: Optional[str] = None
     hub_otp_verified: Optional[bool] = None
     hub_otp_sent_at: Optional[datetime] = None
-    created_at: datetime
     lat: Optional[float] = None
     lng: Optional[float] = None
-    failure_reason: Optional[str] = None
+    city: Optional[str] = None
+    created_at: datetime
 
 
 # --- Dispatcher Hub Management ---
@@ -312,6 +320,7 @@ class DispatcherHubOut(BaseModel):
     today_earnings_inr: float
     current_packages_held: int
     owner_phone: Optional[str] = None
+    city: Optional[str] = None
 
     class Config:
         from_attributes = True

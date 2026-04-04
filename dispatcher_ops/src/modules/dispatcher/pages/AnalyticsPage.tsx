@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { useAnalyticsStore } from '../store/analyticsStore';
+import { useCityStore } from '../store/cityStore';
 import { AnalyticsApi } from '../api/analyticsApi';
 
 export const AnalyticsPage: React.FC = () => {
@@ -9,19 +10,23 @@ export const AnalyticsPage: React.FC = () => {
     avgResolutionTime,
     slaBreachCount,
     rerouteSuccessRate,
+    carbonReduction,
+    costSaved,
     setLeaderboard,
     setFailureZones,
     setGlobalMetrics,
   } = useAnalyticsStore();
+
+  const { selectedCity } = useCityStore();
 
   useEffect(() => {
     let mounted = true;
     const fetchAnalytics = async () => {
       // Fetch in parallel for speed
       const [lbResp, fzResp, gmResp] = await Promise.all([
-        AnalyticsApi.getLeaderboard(),
-        AnalyticsApi.getFailureZones(),
-        AnalyticsApi.getGlobalMetrics(),
+        AnalyticsApi.getLeaderboard(selectedCity),
+        AnalyticsApi.getFailureZones(selectedCity),
+        AnalyticsApi.getGlobalMetrics(selectedCity),
       ]);
 
       if (mounted) {
@@ -33,7 +38,7 @@ export const AnalyticsPage: React.FC = () => {
 
     fetchAnalytics();
     return () => { mounted = false; };
-  }, [setLeaderboard, setFailureZones, setGlobalMetrics]);
+  }, [setLeaderboard, setFailureZones, setGlobalMetrics, selectedCity]);
 
   return (
     <div className="space-y-6">
@@ -46,27 +51,41 @@ export const AnalyticsPage: React.FC = () => {
       </div>
 
       {/* Global Metrics Row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 flex flex-col items-center justify-center shadow-sm">
-          <p className="text-sm font-semibold text-slate-500 mb-1 uppercase tracking-wide">Avg Resolution Time</p>
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="bg-white p-4 lg:p-5 rounded-2xl border border-slate-200 flex flex-col items-center justify-center shadow-sm col-span-2 sm:col-span-1">
+          <p className="text-xs lg:text-sm font-semibold text-slate-500 mb-1 uppercase tracking-wide text-center">Avg Resolution</p>
           <div className="flex items-baseline gap-1.5">
-            <span className="text-3xl font-black text-blue-600">{avgResolutionTime}</span>
-            <span className="text-sm font-bold text-blue-400">mins</span>
+            <span className="text-2xl lg:text-3xl font-black text-blue-600">{avgResolutionTime}</span>
+            <span className="text-xs font-bold text-blue-400">mins</span>
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 flex flex-col items-center justify-center shadow-sm">
-          <p className="text-sm font-semibold text-slate-500 mb-1 uppercase tracking-wide">SLA Breaches (Today)</p>
+        <div className="bg-white p-4 lg:p-5 rounded-2xl border border-slate-200 flex flex-col items-center justify-center shadow-sm col-span-2 sm:col-span-1">
+          <p className="text-xs lg:text-sm font-semibold text-slate-500 mb-1 uppercase tracking-wide text-center">SLA Breaches</p>
           <div className="flex items-baseline gap-1.5">
-            <span className="text-3xl font-black text-red-600">{slaBreachCount}</span>
-            <span className="text-sm font-bold text-red-400">incidents</span>
+            <span className="text-2xl lg:text-3xl font-black text-red-600">{slaBreachCount}</span>
+            <span className="text-xs font-bold text-red-400">issues</span>
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 flex flex-col items-center justify-center shadow-sm">
-          <p className="text-sm font-semibold text-slate-500 mb-1 uppercase tracking-wide">Reroute Success</p>
+        <div className="bg-white p-4 lg:p-5 rounded-2xl border border-slate-200 flex flex-col items-center justify-center shadow-sm">
+          <p className="text-xs lg:text-sm font-semibold text-slate-500 mb-1 uppercase tracking-wide text-center">Reroute Success</p>
           <div className="flex items-baseline gap-1.5">
-            <span className="text-3xl font-black text-emerald-600">{rerouteSuccessRate}%</span>
+            <span className="text-2xl lg:text-3xl font-black text-emerald-600">{rerouteSuccessRate}%</span>
+          </div>
+        </div>
+
+        <div className="bg-white p-4 lg:p-5 rounded-2xl border border-slate-200 flex flex-col items-center justify-center shadow-sm">
+          <p className="text-xs lg:text-sm font-semibold text-slate-500 mb-1 uppercase tracking-wide text-center">CO₂ Reduced</p>
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-2xl lg:text-3xl font-black text-teal-600">{carbonReduction}%</span>
+          </div>
+        </div>
+
+        <div className="bg-white p-4 lg:p-5 rounded-2xl border border-slate-200 flex flex-col items-center justify-center shadow-sm col-span-2 lg:col-span-1">
+          <p className="text-xs lg:text-sm font-semibold text-slate-500 mb-1 uppercase tracking-wide text-center">Cost Saved</p>
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-2xl lg:text-3xl font-black text-indigo-600">₹{costSaved.toLocaleString()}</span>
           </div>
         </div>
       </div>

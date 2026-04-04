@@ -60,7 +60,7 @@ async def order_delivery_queue(
     start_lat = driver_current_lat
     start_lng = driver_current_lng
 
-    if start_lat == 0.0 and start_lng == 0.0:
+    if start_lat is None or start_lng is None or (start_lat == 0.0 and start_lng == 0.0):
         # Driver location not available — use centroid of all geocoded deliveries
         start_lat = sum(d.lat for d in deliveries_with_loc) / len(deliveries_with_loc)
         start_lng = sum(d.lng for d in deliveries_with_loc) / len(deliveries_with_loc)

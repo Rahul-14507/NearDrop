@@ -36,12 +36,7 @@ const statusConfig: Record<IncidentStatus, { label: string; bg: string; color: s
     color: '#059669',
     dot: '#10b981',
   },
-  ESCALATED: {
-    label: 'Escalated',
-    bg: 'rgba(239,68,68,0.12)',
-    color: '#dc2626',
-    dot: '#ef4444',
-  },
+
   FAILED: {
     label: 'Failed',
     bg: 'rgba(71,85,105,0.12)',

@@ -3,32 +3,39 @@ import { fetchWithAuth } from './apiClient';
 
 export const IncidentsApi = {
   // Fetch the active queue from the backend
-  getActiveIncidents: async (): Promise<ApiResponse<Incident[]>> => {
+  getActiveIncidents: async (city?: string): Promise<ApiResponse<Incident[]>> => {
     try {
-      const response = await fetchWithAuth('/api/dispatcher/deliveries');
+      // Append city query param if selected city is not 'All Cities'
+      const queryParam = city && city !== 'All Cities' ? `?city=${encodeURIComponent(city)}` : '';
+      const response = await fetchWithAuth(`/api/dispatcher/deliveries${queryParam}`);
       if (!response.ok) throw new Error('Failed to fetch incidents');
       
       const data = await response.json();
       
       // Map backend DispatcherDeliveryListOut to frontend Incident
-      const incidents: Incident[] = data
-        .filter((d: any) => d.lat != null && d.lng != null) // Skip deliveries with no geocoords
-        .map((d: any) => ({
-          id: String(d.id),
-          deliveryId: d.order_id,
-          driverId: String(d.driver_id),
-          location: d.address,
-          coordinates: { lat: d.lat, lng: d.lng },
-          timestamp: d.created_at,
-          status: mapStatus(d.status),
-          failureReason: d.failure_reason || 'Delivery failed',
-          severity: 'high',
-          slaDeadline: new Date(new Date(d.created_at).getTime() + 1800000).toISOString()
-        }));
+      const incidents: Incident[] = data.map((d: any) => ({
+        id: String(d.id),
+        deliveryId: d.order_id,
+        driverId: String(d.driver_id),
+        location: d.address,
+        city: d.city || 'Hyderabad', // Default fallback for now
+        coordinates: { lat: d.lat || 17.43, lng: d.lng || 78.44 },
+        timestamp: d.created_at,
+        status: mapStatus(d.status),
+        failureReason: d.failure_reason || 'Delivery failed',
+        severity: 'high',
+        slaDeadline: new Date(new Date(d.created_at).getTime() + 1800000).toISOString()
+      }));
+
+      // Fallback client-side filtering in case backend ignores the ?city param
+      let filteredIncidents = incidents.filter(inc => inc.status !== 'RESOLVED' && inc.status !== 'FAILED');
+      if (city && city !== 'All Cities') {
+        filteredIncidents = filteredIncidents.filter(inc => inc.city.toLowerCase() === city.toLowerCase());
+      }
 
       return {
         success: true,
-        data: incidents.filter(inc => inc.status !== 'RESOLVED' && inc.status !== 'FAILED'),
+        data: filteredIncidents,
       };
     } catch (error: any) {
       return { success: false, data: [], message: error.message };

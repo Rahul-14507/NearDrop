@@ -8,8 +8,7 @@ interface IncidentRowProps {
   incident: Incident;
   index: number;
   onResolve: (id: string) => void;
-  onEscalate: (id: string) => void;
-  onAutoAssign: (id: string) => void;
+  onAssign: (id: string) => void;
 }
 
 function formatTime(iso: string): string {
@@ -21,7 +20,7 @@ function formatTime(iso: string): string {
   });
 }
 
-export const IncidentRow: React.FC<IncidentRowProps> = ({ incident, index, onResolve, onEscalate, onAutoAssign }) => {
+export const IncidentRow: React.FC<IncidentRowProps> = ({ incident, index, onResolve, onAssign }) => {
   const slaStatus = SLAEngine.evaluateSLA(incident);
 
   return (
@@ -93,8 +92,7 @@ export const IncidentRow: React.FC<IncidentRowProps> = ({ incident, index, onRes
         <ActionButtons
           incident={incident}
           onResolve={onResolve}
-          onEscalate={onEscalate}
-          onAutoAssign={onAutoAssign}
+          onAssign={onAssign}
         />
       </td>
     </tr>

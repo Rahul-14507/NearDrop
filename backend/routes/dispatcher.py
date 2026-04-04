@@ -29,6 +29,9 @@ from schemas import (
 )
 from services.azure_maps import geocode_address
 from services.queue_engine import order_delivery_queue
+from services.trust_score_engine import calculate_trust_score
+from services.sustainability_engine import calculate_sustainability
+from services.cost_optimization_engine import calculate_cost_savings
 from websocket_manager import manager
 from services import fcm as fcm_service
 
@@ -41,14 +44,17 @@ router = APIRouter(prefix="/dispatcher", tags=["dispatcher"])
 
 @router.get("/drivers", response_model=list[DispatcherDriverOut])
 async def list_drivers(
+    city: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     _: Dispatcher = Depends(get_current_dispatcher),
 ):
     window_start = datetime.utcnow() - timedelta(days=7)
-    # Relax threshold to 24 hours so seeded drivers show up in the portal
     active_threshold = datetime.utcnow() - timedelta(hours=24)
 
-    result = await db.execute(select(Driver))
+    query = select(Driver)
+    if city and city != "All Cities":
+        query = query.where(Driver.city == city)
+    result = await db.execute(query)
     drivers = result.scalars().all()
 
     output = []
@@ -84,6 +90,17 @@ async def list_drivers(
         )
         today_failed = failed_result.scalar() or 0
 
+        # Calculate dynamic trust score
+        driver_perf = calculate_trust_score(
+            driver_id=str(driver.id),
+            on_time_completion=min(100.0, (today_completed / (today_assigned or 1)) * 100.0),
+            recovery_success=85.0 if today_completed > 0 else 50.0,
+            sla_adherence=90.0,
+            delivery_confirmation=95.0,
+            heartbeat_reliability=100.0 if is_active else 40.0,
+            historical_score=driver.trust_score
+        )
+
         output.append(DispatcherDriverOut(
             id=driver.id,
             name=driver.name,
@@ -94,7 +111,9 @@ async def list_drivers(
             today_assigned=today_assigned,
             today_completed=today_completed,
             today_failed=today_failed,
-            trust_score=driver.trust_score,
+            trust_score=driver_perf["trust_score"],
+            band=driver_perf["band"],
+            city=driver.city,
         ))
     return output
 
@@ -170,7 +189,7 @@ async def upload_batch(
             driver_id=driver_id,
             batch_id=batch.id,
             address=row.get("delivery_address", ""),
-            order_id=f"{row.get('delivery_id', '')}-{batch.batch_code.split('-')[-1]}-{i + 1}",
+            order_id=row.get("delivery_id", ""),
             recipient_name=row.get("customer_name", ""),
             customer_email=row.get("customer_email", ""),
             customer_phone=row.get("customer_phone", ""),
@@ -180,6 +199,7 @@ async def upload_batch(
             lat=geo["lat"] if geo else None,
             lng=geo["lng"] if geo else None,
             queue_position=None,
+            city=driver.city,
         )
         db.add(delivery)
         deliveries.append(delivery)
@@ -237,7 +257,6 @@ async def upload_batch(
     ]
 
     await manager.broadcast("batch_assigned", {
-        "id": batch.id,
         "driver_id": driver_id,
         "batch_code": batch_code,
         "total_deliveries": len(rows),
@@ -342,6 +361,7 @@ async def list_batches(
             "batch_code": batch.batch_code,
             "driver_id": batch.driver_id,
             "driver_name": batch.driver.name if batch.driver else "Unknown",
+            "city": batch.driver.city if batch.driver else "Unknown",
             "dispatcher_id": batch.dispatcher_id,
             "assigned_at": batch.assigned_at.isoformat() if batch.assigned_at else None,
             "total_deliveries": batch.total_deliveries,
@@ -368,71 +388,172 @@ async def list_batches(
     return output
 
 
-# These mobile routes are moved to batch.py to be accessible at /batch/... without prefix.
+# ─── Batch Accept / Reject (driver-facing) ────────────────────────────────────
 
+@router.post("/batch/{batch_code}/accept", response_model=BatchAcceptResponse)
+async def accept_batch(
+    batch_code: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Driver accepts a batch — marks batch active and first delivery en_route."""
+    batch_result = await db.execute(
+        select(DeliveryBatch)
+        .options(selectinload(DeliveryBatch.driver))
+        .where(DeliveryBatch.batch_code == batch_code)
+    )
+    batch = batch_result.scalar_one_or_none()
+    if not batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+
+    batch.status = "accepted"
+    db.add(batch)
+
+    # Reload ordered deliveries
+    deliveries_result = await db.execute(
+        select(Delivery)
+        .where(Delivery.batch_id == batch.id)
+        .order_by(Delivery.queue_position)
+    )
+    deliveries = deliveries_result.scalars().all()
+
+    # Mark first delivery as en_route (it likely already is, but be explicit)
+    if deliveries:
+        first = deliveries[0]
+        first.status = DeliveryStatus.en_route
+        db.add(first)
+
+    await db.commit()
+
+    return BatchAcceptResponse(
+        batch_code=batch_code,
+        status="accepted",
+        deliveries=[DispatcherDeliveryOut.model_validate(d) for d in deliveries],
+    )
+
+
+@router.post("/batch/{batch_code}/reject")
+async def reject_batch(
+    batch_code: str,
+    body: BatchRejectRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Driver rejects a batch — marks batch rejected and broadcasts WS event."""
+    batch_result = await db.execute(
+        select(DeliveryBatch)
+        .options(selectinload(DeliveryBatch.driver))
+        .where(DeliveryBatch.batch_code == batch_code)
+    )
+    batch = batch_result.scalar_one_or_none()
+    if not batch:
+        raise HTTPException(status_code=404, detail="Batch not found")
+
+    batch.status = "rejected"
+    db.add(batch)
+    await db.commit()
+
+    driver_name = batch.driver.name if batch.driver else "Unknown"
+
+    await manager.broadcast("batch_rejected", {
+        "batch_code": batch_code,
+        "driver_name": driver_name,
+        "reason": body.reason,
+    })
+
+    return {"batch_code": batch_code, "status": "rejected"}
 
 
 # ─── Stats ────────────────────────────────────────────────────────────────────
 
 @router.get("/stats", response_model=DispatcherStatsOut)
 async def get_dispatcher_stats(
+    city: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     _: Dispatcher = Depends(get_current_dispatcher),
 ):
     window_start = datetime.utcnow() - timedelta(days=7)
-    active_threshold = datetime.utcnow() - timedelta(minutes=5)
+    active_threshold = datetime.utcnow() - timedelta(hours=24)
 
-    drivers_result = await db.execute(select(Driver))
+    drivers_query = select(Driver)
+    if city and city != "All Cities":
+        drivers_query = drivers_query.where(Driver.city == city)
+    drivers_result = await db.execute(drivers_query)
     all_drivers = drivers_result.scalars().all()
     active_drivers = sum(
         1 for d in all_drivers
         if d.last_ping_at and d.last_ping_at >= active_threshold
     )
 
-    total_result = await db.execute(
-        select(func.count(Delivery.id)).where(Delivery.created_at >= window_start)
-    )
+    total_query = select(func.count(Delivery.id)).where(Delivery.created_at >= window_start)
+    if city and city != "All Cities":
+        total_query = total_query.where(Delivery.city == city)
+    total_result = await db.execute(total_query)
     total_assigned = total_result.scalar() or 0
 
-    delivered_result = await db.execute(
-        select(func.count(Delivery.id)).where(
-            Delivery.created_at >= window_start,
-            Delivery.status == DeliveryStatus.delivered,
-        )
+    delivered_query = select(func.count(Delivery.id)).where(
+        Delivery.created_at >= window_start,
+        Delivery.status == DeliveryStatus.delivered,
     )
+    if city and city != "All Cities":
+        delivered_query = delivered_query.where(Delivery.city == city)
+    delivered_result = await db.execute(delivered_query)
     delivered_today = delivered_result.scalar() or 0
 
-    failed_result = await db.execute(
-        select(func.count(Delivery.id)).where(
-            Delivery.created_at >= window_start,
-            Delivery.status == DeliveryStatus.failed,
-        )
+    failed_query = select(func.count(Delivery.id)).where(
+        Delivery.created_at >= window_start,
+        Delivery.status == DeliveryStatus.failed,
     )
+    if city and city != "All Cities":
+        failed_query = failed_query.where(Delivery.city == city)
+    failed_result = await db.execute(failed_query)
     failed_today = failed_result.scalar() or 0
 
-    hub_rerouted_result = await db.execute(
-        select(func.count(HubBroadcast.id)).where(
-            HubBroadcast.broadcast_at >= window_start,
-            HubBroadcast.accepted_at != None,
-        )
+    hub_rerouted_query = select(func.count(HubBroadcast.id)).join(Hub).where(
+        HubBroadcast.broadcast_at >= window_start,
+        HubBroadcast.accepted_at != None,
     )
+    if city and city != "All Cities":
+        hub_rerouted_query = hub_rerouted_query.where(Hub.city == city)
+    hub_rerouted_result = await db.execute(hub_rerouted_query)
     hub_rerouted = hub_rerouted_result.scalar() or 0
 
-    pending_result = await db.execute(
-        select(func.count(Delivery.id)).where(
-            Delivery.created_at >= window_start,
-            Delivery.status.in_([DeliveryStatus.en_route, DeliveryStatus.arrived]),
-        )
+    pending_query = select(func.count(Delivery.id)).where(
+        Delivery.created_at >= window_start,
+        Delivery.status.in_([DeliveryStatus.en_route, DeliveryStatus.arrived]),
     )
+    if city and city != "All Cities":
+        pending_query = pending_query.where(Delivery.city == city)
+    pending_result = await db.execute(pending_query)
     pending_today = pending_result.scalar() or 0
 
-    active_hubs_result = await db.execute(
-        select(func.count(Hub.id)).where(Hub.availability == True)
-    )
+    active_hubs_query = select(func.count(Hub.id)).where(Hub.availability == True)
+    if city and city != "All Cities":
+        active_hubs_query = active_hubs_query.where(Hub.city == city)
+    active_hubs_result = await db.execute(active_hubs_query)
     active_hubs = active_hubs_result.scalar() or 0
 
     success_rate = round(delivered_today / total_assigned * 100, 1) if total_assigned > 0 else 0.0
-    co2_saved = round(hub_rerouted * 0.8, 2)
+
+    avg_km_saved_per_reroute = 4.0
+    avg_empty_trip_km = 6.0
+    idle_time_saved_per_resolved = 0.25 # hours
+
+    km_saved = hub_rerouted * avg_km_saved_per_reroute
+    empty_km_avoided = delivered_today * avg_empty_trip_km
+    baseline_emissions = total_assigned * avg_empty_trip_km * 0.9
+
+    sus_metrics = calculate_sustainability(
+        empty_km_avoided=empty_km_avoided,
+        reroute_km_saved=km_saved,
+        baseline_emissions=baseline_emissions
+    )
+
+    cost_saved = calculate_cost_savings(
+        km_saved=km_saved,
+        sla_penalty_avoided=hub_rerouted,
+        idle_hours_saved=hub_rerouted * idle_time_saved_per_resolved
+    )
 
     return DispatcherStatsOut(
         active_drivers=active_drivers,
@@ -442,7 +563,9 @@ async def get_dispatcher_stats(
         hub_rerouted_today=hub_rerouted,
         pending_today=pending_today,
         success_rate_percent=success_rate,
-        co2_saved_kg=co2_saved,
+        co2_saved_kg=sus_metrics["co2_saved_kg"],
+        co2_reduced_percent=sus_metrics["co2_reduced_percent"],
+        cost_saved=cost_saved,
         active_hubs=active_hubs,
     )
 
@@ -483,10 +606,10 @@ async def list_all_deliveries(
             customer_phone=d.customer_phone,
             hub_otp_verified=d.hub_otp_verified,
             hub_otp_sent_at=d.hub_otp_sent_at,
-            created_at=d.created_at,
             lat=d.lat,
             lng=d.lng,
-            failure_reason=d.failure_reason,
+            city=d.city,
+            created_at=d.created_at,
         ))
     return output
 
@@ -538,6 +661,7 @@ async def list_hubs(
             today_earnings_inr=hub.today_earnings or 0.0,
             current_packages_held=current_packages_held,
             owner_phone=hub.owner_phone,
+            city=hub.city,
         ))
     return output
 
@@ -552,7 +676,7 @@ async def register_hub(
     lat = req.lat
     lng = req.lng
 
-    if lat is None or lng is None:
+    if lat is None or lng is None or (lat == 0.0 and lng == 0.0):
         geo = await geocode_address(req.address)
         if geo:
             lat = geo["lat"]

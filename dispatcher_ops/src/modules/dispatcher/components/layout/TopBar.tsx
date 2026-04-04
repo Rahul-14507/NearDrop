@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
+import { useCityStore } from '../../store/cityStore';
 
 const pageTitles: Record<string, { title: string; subtitle: string }> = {
   '/dispatcher': { title: 'Dashboard', subtitle: 'Overview of operations and KPIs' },
@@ -12,6 +13,8 @@ export const TopBar: React.FC = () => {
   const pageInfo = pageTitles[location.pathname] ?? { title: 'Dispatcher', subtitle: 'NearDrop Ops' };
   
   const [nowDate, setNowDate] = useState(new Date());
+
+  const { selectedCity, availableCities, setSelectedCity } = useCityStore();
 
   useEffect(() => {
     const timer = setInterval(() => setNowDate(new Date()), 1000);
@@ -40,6 +43,25 @@ export const TopBar: React.FC = () => {
 
       {/* Right side controls */}
       <div className="flex items-center gap-4">
+        {/* City Selector */}
+        <div className="flex items-center">
+          <label htmlFor="city-selector" className="text-xs font-semibold tracking-wide text-slate-500 mr-2 uppercase">
+            Operations City
+          </label>
+          <select
+            id="city-selector"
+            value={selectedCity}
+            onChange={(e) => setSelectedCity(e.target.value)}
+            className="text-sm font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:bg-slate-50 transition-colors shadow-sm cursor-pointer"
+          >
+            {availableCities.map((city) => (
+              <option key={city} value={city}>{city}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="h-6 w-px bg-slate-200 mx-1 border-r border-slate-200"></div>
+
         {/* Sync Status */}
         <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-100">
           <span className="relative flex h-2 w-2">

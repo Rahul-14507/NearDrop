@@ -5,6 +5,8 @@ import { IncidentsApi } from '../api/incidentsApi';
 import { RidersApi } from '../api/ridersApi';
 import { fetchWithAuth } from '../api/apiClient';
 import { offsetOverlappingMarkers } from '../utils/mapOffsets';
+import { useCityStore } from '../store/cityStore';
+import { CITY_MAP_CONFIG } from '../constants/mapConstants';
 
 import type { Coordinates, MapMarker, Incident, Rider, Hub } from '../types/dispatcher.types';
 
@@ -22,31 +24,47 @@ export const MapPage: React.FC = () => {
   const [hubs, setHubs] = useState<Hub[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const { selectedCity } = useCityStore();
+
   const [manualFocusId, setManualFocusId] = useState<string | undefined>(state?.focusIncidentId);
   const [manualCenter, setManualCenter] = useState<Coordinates | undefined>(state?.coordinates);
+  const [prevCity, setPrevCity] = useState(selectedCity);
+
+  useEffect(() => {
+    if (selectedCity !== prevCity) {
+      setManualFocusId(undefined);
+      setManualCenter(undefined);
+      setPrevCity(selectedCity);
+    }
+  }, [selectedCity, prevCity]);
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
         const [incidentsResp, ridersResp, hubsResp] = await Promise.all([
-          IncidentsApi.getActiveIncidents(),
-          RidersApi.getRealtimeFleet(),
+          IncidentsApi.getActiveIncidents(selectedCity),
+          RidersApi.getRealtimeFleet(selectedCity),
           fetchWithAuth('/api/dispatcher/hubs').then(r => r.json().then(data => ({ success: true, data })))
         ]);
 
         if (incidentsResp.success) setIncidents(incidentsResp.data);
         if (ridersResp.success) setRiders(ridersResp.data);
         if (hubsResp.success) {
-          const mappedHubs: Hub[] = hubsResp.data.map((h: any) => ({
+          let mappedHubs: Hub[] = hubsResp.data.map((h: any) => ({
             id: String(h.id),
             zone: h.name,
+            city: h.city || 'Hyderabad', // Mock fallback
             activeLoad: h.current_packages_held,
             maxCapacity: 50,
             availableSlots: 50 - h.current_packages_held,
             riskLevel: h.current_packages_held > 40 ? 'Critical' : h.current_packages_held > 25 ? 'Warning' : 'Safe',
             coordinates: { lat: h.lat, lng: h.lng }
           }));
+
+          if (selectedCity !== 'All Cities') {
+            mappedHubs = mappedHubs.filter(h => h.city.toLowerCase() === selectedCity.toLowerCase());
+          }
           setHubs(mappedHubs);
         }
       } catch (err) {
@@ -60,7 +78,7 @@ export const MapPage: React.FC = () => {
     // Refresh every 30 seconds for live telemetry if no WebSocket
     const interval = setInterval(fetchData, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [selectedCity]);
 
   const markers: MapMarker[] = useMemo(() => {
     const hubMarkers: MapMarker[] = hubs.map(h => ({
@@ -108,7 +126,7 @@ export const MapPage: React.FC = () => {
         <div>
           <h2 className="text-xl font-bold text-slate-800">Live Dispatch Map</h2>
           <p className="text-sm text-slate-500 mt-0.5">
-            Real-time driver positions, failed delivery points, and nearest hubs — Hyderabad Zone
+            Real-time driver positions, failed delivery points, and nearest hubs — {selectedCity} Zone
           </p>
         </div>
 
@@ -145,8 +163,8 @@ export const MapPage: React.FC = () => {
         <div className="flex-1 rounded-2xl overflow-hidden border border-slate-200 shadow-lg relative">
           <LiveDispatchMap
             markers={markers}
-            focusCenter={manualCenter}
-            focusZoom={manualCenter ? 16 : 13}
+            focusCenter={manualCenter || (CITY_MAP_CONFIG[selectedCity] ? { lat: CITY_MAP_CONFIG[selectedCity].lat, lng: CITY_MAP_CONFIG[selectedCity].lng } : undefined)}
+            focusZoom={manualCenter ? 16 : (CITY_MAP_CONFIG[selectedCity]?.zoom || 13)}
             focusedIncidentId={manualFocusId}
             className="w-full h-full"
           />

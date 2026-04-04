@@ -1,8 +1,26 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, LineChart, Loader2 } from 'lucide-react';
+import { Send, LineChart, Loader2, Sparkles, Download, Printer, RefreshCw } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+
+const QuotationSkeleton = () => (
+  <div className="animate-fade-in">
+    <div className="skeleton skeleton-title" />
+    <div className="skeleton skeleton-text" style={{ width: '40%', marginBottom: '2rem' }} />
+    
+    <div className="skeleton-table-row skeleton" />
+    <div className="skeleton-table-row skeleton" />
+    <div className="skeleton-table-row skeleton" />
+    <div className="skeleton-table-row skeleton" style={{ marginBottom: '2rem' }} />
+
+    <div className="skeleton skeleton-text" style={{ width: '100%' }} />
+    <div className="skeleton skeleton-text" style={{ width: '90%' }} />
+    <div className="skeleton skeleton-text" style={{ width: '95%' }} />
+  </div>
+);
 
 function FreightIQ() {
-  const [stage, setStage] = useState('form'); // 'form' | 'chat'
+  const [stage, setStage] = useState('form'); // 'form' | 'result'
   const [formData, setFormData] = useState({
     origin: '',
     destination: '',
@@ -13,21 +31,13 @@ function FreightIQ() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const chatEndRef = useRef(null);
-
-  const scrollToBottom = () => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+  const resultRef = useRef(null);
 
   const handleStartEstimate = async (e) => {
     e.preventDefault();
     if (!formData.origin || !formData.destination) return;
     
-    setStage('chat');
+    setStage('result');
     setIsLoading(true);
     
     try {
@@ -39,12 +49,11 @@ function FreightIQ() {
       
       const data = await response.json();
       setMessages([
-        { role: 'user', content: `I want to ship ${formData.weight} of ${formData.cargo_type} from ${formData.origin} to ${formData.destination}. Timeline: ${formData.timeline}. What is the current market rate and what should I know?` },
         { role: 'model', content: data.reply }
       ]);
     } catch (error) {
       setMessages([
-        { role: 'model', content: 'Sorry, I am unable to connect to the FreightIQ engine at the moment.' }
+        { role: 'model', content: '## Error\n\nSorry, I am unable to connect to the FreightIQ engine at the moment. Please try again later.' }
       ]);
     } finally {
       setIsLoading(false);
@@ -57,35 +66,36 @@ function FreightIQ() {
     
     const userMsg = input.trim();
     setInput('');
-    const newHistory = [...messages, { role: 'user', content: userMsg }];
-    setMessages(newHistory);
+    const contextHistory = [...messages, { role: 'user', content: userMsg }];
     setIsLoading(true);
     
     try {
       const response = await fetch('http://localhost:8000/public/freight-iq', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...formData, history: newHistory })
+        body: JSON.stringify({ ...formData, history: contextHistory })
       });
       
       const data = await response.json();
-      setMessages([...newHistory, { role: 'model', content: data.reply }]);
+      setMessages([...contextHistory, { role: 'model', content: data.reply }]);
     } catch (error) {
-      setMessages([...newHistory, { role: 'model', content: 'Connection error while processing your request.' }]);
+      setMessages([...contextHistory, { role: 'model', content: 'Connection error while refining your quotation.' }]);
     } finally {
       setIsLoading(false);
     }
   };
 
+  const latestQuote = [...messages].reverse().find(m => m.role === 'model')?.content;
+
   return (
-    <div className="animate-fade-in" style={{ maxWidth: '800px', margin: '0 auto' }}>
+    <div className="animate-fade-in" style={{ maxWidth: '900px', margin: '0 auto' }}>
       <div className="page-header" style={{ marginBottom: '2rem' }}>
         <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.75rem' }}>
           <LineChart size={36} color="var(--accent-primary)" />
           FreightIQ Intelligence
         </h1>
         <p className="page-description">
-          Provide your cargo details below. We'll scrape live rate signals from public indices (e.g. Freightos, Xeneta) and validate your quotes.
+          Generate professional market-indexed quotations and validate your freight costs using global logistics signals.
         </p>
       </div>
 
@@ -114,37 +124,67 @@ function FreightIQ() {
             </div>
           </div>
           <button type="submit" className="btn-primary" style={{ width: '100%', justifyContent: 'center' }}>
-            Generate Market Estimate
+            Generate Market Quotation
           </button>
         </form>
       ) : (
-        <div className="glass-card chat-container">
-          <div className="chat-history">
-            {messages.map((msg, i) => (
-              <div key={i} className={`chat-bubble ${msg.role === 'model' ? 'ai' : 'user'}`} style={{ whiteSpace: 'pre-wrap' }}>
-                {msg.content}
+        <div className="quotation-container">
+          <div className="quotation-paper" ref={resultRef}>
+            <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+              <div style={{ opacity: 0.6, fontSize: '0.8rem' }}>REF: FIQ-{new Date().getTime().toString().slice(-6)}</div>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button className="btn-secondary" style={{ padding: '0.5rem' }} onClick={() => window.print()} title="Print">
+                  <Printer size={16} />
+                </button>
+                <button className="btn-secondary" style={{ padding: '0.5rem' }} title="Download PDF">
+                  <Download size={16} />
+                </button>
               </div>
-            ))}
-            {isLoading && (
-              <div className="chat-bubble ai" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            </div>
+
+            {isLoading && !latestQuote ? (
+              <QuotationSkeleton />
+            ) : (
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {latestQuote}
+              </ReactMarkdown>
+            )}
+            
+            {isLoading && latestQuote && (
+              <div style={{ marginTop: '2rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--accent-primary)', fontWeight: 500 }}>
                 <Loader2 className="lucide-spin" size={18} />
-                Analyzing market signals...
+                Updating current quotation with new market data...
               </div>
             )}
-            <div ref={chatEndRef} />
           </div>
-          <form onSubmit={handleSendMessage} className="chat-input-area">
-            <input 
-              className="input-field" 
-              placeholder="E.g., Format the quote for me to reply, or what if I ship by air?" 
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              disabled={isLoading}
-            />
-            <button type="submit" className="btn-primary" disabled={isLoading}>
-              <Send size={18} />
+
+          {!isLoading && latestQuote && (
+            <div className="refine-section no-print">
+              <label className="refine-label">
+                <Sparkles size={16} color="var(--accent-primary)" />
+                Need to adjust the cargo or negotiate further?
+              </label>
+              <form onSubmit={handleSendMessage} className="refine-input-group">
+                <input 
+                  className="input-field" 
+                  placeholder="e.g., Adjust the quantity, or ask for air freight comparison..." 
+                  value={input}
+                  onChange={e => setInput(e.target.value)}
+                  disabled={isLoading}
+                />
+                <button type="submit" className="btn-primary" disabled={isLoading} style={{ whiteSpace: 'nowrap' }}>
+                  {isLoading ? <Loader2 className="lucide-spin" size={18} /> : <RefreshCw size={18} />}
+                  <span style={{ marginLeft: '0.5rem' }}>Refine Quote</span>
+                </button>
+              </form>
+            </div>
+          )}
+
+          <div style={{ textAlign: 'center' }}>
+            <button className="btn-secondary" onClick={() => { setStage('form'); setMessages([]); }}>
+              Start New Quotation
             </button>
-          </form>
+          </div>
         </div>
       )}
     </div>

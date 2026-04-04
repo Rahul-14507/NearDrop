@@ -1,23 +1,25 @@
 import React, { useEffect } from 'react';
 import { useRiderStore } from '../store/riderStore';
+import { useCityStore } from '../store/cityStore';
 import { RidersApi } from '../api/ridersApi';
 import type { RiderStatus } from '../types/dispatcher.types';
 
 export const RidersPage: React.FC = () => {
   const { riders, setRiders } = useRiderStore();
+  const { selectedCity } = useCityStore();
   const riderList = Object.values(riders);
 
   useEffect(() => {
     let mounted = true;
     const fetchRiders = async () => {
-      const resp = await RidersApi.getRealtimeFleet();
+      const resp = await RidersApi.getRealtimeFleet(selectedCity);
       if (mounted && resp.success) {
         setRiders(resp.data);
       }
     };
     fetchRiders();
     return () => { mounted = false; };
-  }, [setRiders]);
+  }, [setRiders, selectedCity]);
 
   const getStatusBadge = (status: RiderStatus) => {
     switch (status) {
@@ -76,17 +78,26 @@ export const RidersPage: React.FC = () => {
             <div className="grid grid-cols-3 gap-2 py-3 border-y border-dashed border-slate-200 mb-4">
               <div className="flex flex-col">
                 <span className="text-[10px] text-slate-400 uppercase tracking-wide">Trust Score</span>
-                <span className={`text-sm font-bold ${rider.score > 85 ? 'text-emerald-600' : 'text-amber-600'}`}>
-                  {rider.score}%
-                </span>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className={`text-sm font-bold ${rider.score > 85 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                    {rider.score}%
+                  </span>
+                  {rider.band && (
+                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${
+                      rider.band === 'Elite' ? 'bg-emerald-100 text-emerald-700' :
+                      rider.band === 'Reliable' ? 'bg-blue-100 text-blue-700' :
+                      rider.band === 'Needs Attention' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
+                    }`}>{rider.band}</span>
+                  )}
+                </div>
               </div>
               <div className="flex flex-col">
                 <span className="text-[10px] text-slate-400 uppercase tracking-wide">Zone</span>
                 <span className="text-sm font-semibold text-slate-700">{rider.zone}</span>
               </div>
               <div className="flex flex-col">
-                <span className="text-[10px] text-slate-400 uppercase tracking-wide">Active Load</span>
-                <span className="text-sm font-bold text-slate-700">{rider.load} / 4</span>
+                <span className="text-[10px] text-slate-400 uppercase tracking-wide">Today's Load</span>
+                <span className="text-sm font-bold text-slate-700">{rider.load} Tasks</span>
               </div>
             </div>
 

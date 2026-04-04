@@ -4,17 +4,21 @@ import { KPICard } from '../components/dashboard/KPICard';
 import { StatusBadge } from '../components/incidents/StatusBadge';
 import { useIncidents } from '../hooks/useIncidents';
 import { AnalyticsApi } from '../api/analyticsApi';
+import { useCityStore } from '../store/cityStore';
 import type { KPIStat } from '../types/dispatcher.types';
 
 export const DashboardPage: React.FC = () => {
   const { incidents, loading: incidentsLoading } = useIncidents();
   const [stats, setStats] = useState<KPIStat[]>([]);
   const [statsLoading, setStatsLoading] = useState(true);
+  const { selectedCity } = useCityStore();
 
   useEffect(() => {
+    let mounted = true;
     const fetchStats = async () => {
-      const resp = await AnalyticsApi.getGlobalMetrics();
-      if (resp.success) {
+      setStatsLoading(true);
+      const resp = await AnalyticsApi.getGlobalMetrics(selectedCity);
+      if (mounted && resp.success) {
         // Map backend metrics to KPIStat format
         const kpiData: KPIStat[] = [
           {
@@ -54,10 +58,11 @@ export const DashboardPage: React.FC = () => {
         ];
         setStats(kpiData);
       }
-      setStatsLoading(false);
+      if (mounted) setStatsLoading(false);
     };
     fetchStats();
-  }, []);
+    return () => { mounted = false; };
+  }, [selectedCity]);
 
   // Show the 5 most recent incidents
   const recentIncidents = incidents.slice(0, 5);
@@ -80,7 +85,7 @@ export const DashboardPage: React.FC = () => {
           </div>
           <h2 className="text-2xl font-bold mb-1">Welcome back, Dispatcher</h2>
           <p className="text-blue-200 text-sm">
-            Hyderabad operations zone — {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
+            {selectedCity} operations zone — {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
           </p>
         </div>
 

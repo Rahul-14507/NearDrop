@@ -211,7 +211,7 @@ npm run dev
 # Runs at http://localhost:5174
 ```
 
-> The portals proxy API calls to the FastAPI backend. Ensure the backend is running on port 8000 first, and `GEMINI_API_KEY` is set in `.env` for FreightIQ estimation.
+> The portals proxy API calls to the FastAPI backend. Ensure the backend is running on port 8000 first, and `AZURE_OPENAI_KEY` + `AZURE_OPENAI_ENDPOINT` are set in `.env` for FreightIQ estimation.
 
 ---
 
@@ -376,7 +376,7 @@ The backend geocodes all addresses concurrently, then runs the nearest-neighbor 
 | `GET` | `/navigation/route` | JWT | Turn-by-turn route between two coordinates |
 | `POST` | `/voice/azure-token` | JWT | Short-lived Azure Speech token for Flutter |
 | `GET` | `/public/track/{id}` | — | Public container tracking — live status without login |
-| `POST` | `/public/freight-iq` | — | Gemini LLM-powered market rate estimation and negotiation |
+| `POST` | `/public/freight-iq` | — | Azure OpenAI-powered market rate estimation and negotiation |
 | `WS` | `/ws` | — | WebSocket — real-time delivery events |
 | `GET` | `/health` | — | Health check (DB status) |
 

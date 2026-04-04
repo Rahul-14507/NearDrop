@@ -5,8 +5,8 @@ class AppConfig {
   // Change this to your Azure App Service URL in production
   // e.g. https://neardrop-api.azurewebsites.net
   
-  static String get baseUrl => kIsWeb ? 'http://localhost:8000' : 'http://172.20.42.181:8000';
-  static String get wsBaseUrl => kIsWeb ? 'ws://localhost:8000' : 'ws://172.20.42.181:8000';
+  static String get baseUrl => kIsWeb ? 'http://localhost:8000' : 'http://10.13.218.17:8000';
+  static String get wsBaseUrl => kIsWeb ? 'ws://localhost:8000' : 'ws://10.13.218.17:8000';
 
   // ── Azure Maps ───────────────────────────────────────────
   // Injected at build time via --dart-define=AZURE_MAPS_SUBSCRIPTION_KEY=...
