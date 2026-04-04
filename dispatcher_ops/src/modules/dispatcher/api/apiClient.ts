@@ -1,6 +1,9 @@
 import { useAuthStore } from '../store/authStore';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+
 export const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
+  const fullUrl = url.startsWith('http') ? url : `${API_BASE_URL}${url.startsWith('/') ? '' : '/'}${url}`;
   const token = useAuthStore.getState().token;
 
   // Don't set Content-Type for FormData — browser sets it automatically
@@ -13,7 +16,7 @@ export const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
     ...(options.headers as Record<string, string> ?? {}),
   };
 
-  const response = await fetch(url, { ...options, headers });
+  const response = await fetch(fullUrl, { ...options, headers });
 
   if (response.status === 401) {
     useAuthStore.getState().logout();

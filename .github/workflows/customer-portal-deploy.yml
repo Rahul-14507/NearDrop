@@ -1,0 +1,27 @@
+name: Deploy Customer Portal to Azure Static Web Apps
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'customer_portal/**'
+  workflow_dispatch:
+
+jobs:
+  build_and_deploy_job:
+    runs-on: ubuntu-latest
+    name: Build and Deploy Job
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: true
+      - name: Build And Deploy
+        id: builddeploy
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_CUSTOMER }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: "upload"
+          app_location: "customer_portal"
+          output_location: "dist"
+          app_build_command: "npm install && npm run build"

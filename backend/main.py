@@ -153,13 +153,19 @@ async def logging_middleware(request: Request, call_next):
     return response
 
 
-# CORSMiddleware must be added AFTER jwt_middleware so it becomes the outermost
-# layer. Starlette applies middlewares last-in = outermost, meaning this one
-# processes every request first (sets CORS headers) and every response last
-# (including 401s from jwt_middleware).
+# CORS configuration
+allowed_origins = os.getenv("ALLOWED_ORIGINS", "").split(",")
+allow_origin_regex = None
+
+if not any(allowed_origins):
+    # Default for local development
+    allow_origin_regex = "http://localhost:.*|http://127.0.0.1:.*|http://192.168.1.7:.*"
+    allowed_origins = []
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex="http://localhost:.*|http://127.0.0.1:.*|http://192.168.1.7:.*",
+    allow_origins=allowed_origins if allowed_origins else None,
+    allow_origin_regex=allow_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

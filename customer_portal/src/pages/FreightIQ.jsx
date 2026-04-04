@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Send, LineChart, Loader2, Sparkles, Download, Printer, RefreshCw } from 'lucide-react';
+import { apiFetch } from '../api/apiClient';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -41,9 +42,8 @@ function FreightIQ() {
     setIsLoading(true);
     
     try {
-      const response = await fetch('http://localhost:8000/public/freight-iq', {
+      const response = await apiFetch('/public/freight-iq', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...formData, history: [] })
       });
       
@@ -70,9 +70,8 @@ function FreightIQ() {
     setIsLoading(true);
     
     try {
-      const response = await fetch('http://localhost:8000/public/freight-iq', {
+      const response = await apiFetch('/public/freight-iq', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...formData, history: contextHistory })
       });
       

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Package, Search, MapPin, Truck, CheckCircle } from 'lucide-react';
+import { apiFetch } from '../api/apiClient';
 
 function Tracking() {
   const [trackingId, setTrackingId] = useState('');
@@ -16,7 +17,7 @@ function Tracking() {
     setTrackingData(null);
 
     try {
-      const response = await fetch(`http://localhost:8000/public/track/${trackingId.trim()}`);
+      const response = await apiFetch(`/public/track/${trackingId.trim()}`);
       if (!response.ok) {
         throw new Error('Shipment not found');
       }
